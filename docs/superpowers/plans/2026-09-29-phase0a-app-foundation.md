@@ -31,7 +31,7 @@ Inputs the spec implies but no task's tests cover unless added here. Each line's
 
 1. **A request body that is valid JSON but not an object** (an array, a string, `null`) → `withHandler` must return 400 `VALIDATION_FAILED`, not 500. Test in Task 7.
 2. **A path segment containing `..` or an absolute path passed to the local storage adapter** → must throw `ValidationError`, never touch a file outside `MEDIA_ROOT`. Test in Task 8.
-3. **`MEDIA_ROOT` not writable at readiness time** → `/api/health/ready` returns 503 with `storage: "unwritable"` and the process stays up. Test in Task 8.
+3. **`MEDIA_ROOT` not writable at readiness time** → `/api/health/ready` returns 503 with `storage: "failed"` (the detail is logged at warn level, never returned: the endpoint is public via Nginx) and the process stays up. Test in Task 8. *(Corrected after Task 8's review; the original text returned the internal message.)*
 4. **Database unreachable at boot** → the migration runner exits non-zero with a one-line error naming the host, no stack trace of `pg` internals; the app's readiness returns 503 rather than crashing. Test in Task 6 (runner) and Task 8 (ready).
 5. **A log call with a nested object containing `phone` three levels deep** → redacted. `pino`'s built-in path redaction only handles known paths; the deep redactor must recurse. Test in Task 4.
 
