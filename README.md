@@ -11,8 +11,7 @@ Phase 0A is built: the public pages and the server foundation. There is no login
    `docker run --name saathi-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=saathi -p 5432:5432 -d postgres:16`
    (if 5432 is taken, publish another port and use it in the URLs below).
 3. `cp .env.example .env`, then set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/saathi` and a `MEDIA_SIGNING_SECRET` of at least 32 characters (`openssl rand -hex 32`). `DATABASE_URL_MIGRATIONS` can be left out; it defaults to `DATABASE_URL`.
-4. Apply migrations. `npm run migrate` reads only the shell environment, not `.env`, so either export the variables or run
-   `npx tsx --env-file=.env src/server/db/migrate-cli.ts`.
+4. `npm run migrate` applies the migrations (it reads `.env`).
 5. `npm run dev` (Next.js loads `.env` itself) and open http://localhost:8081.
 
 ## Commands
@@ -22,11 +21,11 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 | `npm run dev` | Next.js dev server on port 8081 with hot reload |
 | `npm run build` | Production build (`output: 'standalone'`) |
 | `npm run start` | `next start` on port 3000 (see note below) |
-| `npm run migrate` | Applies `src/server/db/migrations/*.sql` in name order, using `DATABASE_URL_MIGRATIONS` or else `DATABASE_URL` from the shell |
+| `npm run migrate` | Applies `src/server/db/migrations/*.sql` in name order, using `DATABASE_URL_MIGRATIONS` or else `DATABASE_URL`; loads `.env` (`tsx --env-file=.env`), and fails if `.env` is missing |
 | `npm run build:migrate` | Bundles the migration CLI into `dist/migrate.js` (ESM, with a `createRequire` banner for CommonJS dependencies) |
 | `npm run test` | Unit tests; every `*.int.test.ts` file is excluded, so no database is needed |
 | `npm run test:int` | `vitest run int.test`: the integration tests, against a real Postgres (see "Test database") |
-| `npm run test:e2e` | Playwright smoke tests on a phone (Pixel 7) and a desktop profile; starts `npm run start` unless a server already answers on 3000 or `E2E_BASE_URL` is set |
+| `npm run test:e2e` | Playwright smoke tests on a phone (Pixel 7) and a desktop profile; starts `npm run start` (waiting up to 120 s for `/api/health`) unless a server already answers on 3000 or `E2E_BASE_URL` is set |
 | `npm run lint` / `npm run typecheck` | ESLint (including the `src/server` ↔ UI import boundary) / `tsc --noEmit` |
 | `npm run format` / `npm run format:check` | Prettier write / check |
 
@@ -77,7 +76,7 @@ Code in the repository that no route, script or test uses today (PLAN.md §23.6)
 | --- | --- | --- |
 | `src/components/ui/*` except `button.tsx` (the other shadcn primitives), `src/hooks/use-mobile.tsx`, `src/hooks/use-toast.ts` | Carried over from the initial commit (the Vite app) | Imported by a page or component, from Phase 1's portal screens on |
 | npm packages used only by those primitives: `cmdk`, `embla-carousel-react`, `input-otp`, `react-hook-form`, `react-resizable-panels`, `recharts` | Dependencies of the primitives above | Same as above |
-| npm packages nothing imports: `@hookform/resolvers`, `@tanstack/react-query`, `drizzle-kit`, `@tailwindcss/typography` | From the initial commit, except `drizzle-kit`, added with the Next.js scaffold (migrations are plain SQL run by `runMigrations`) | A first import; otherwise they should be removed |
-| `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `InvalidTransitionError` in `src/server/http/errors.ts` | Part of the PLAN.md §9.7 taxonomy | Phase 1 (login, MFA, permissions) and Phase 2 (stage machines) |
+| `drizzle-kit` (dev dependency; no script runs it) | Added with the Next.js scaffold; migrations are plain SQL run by `runMigrations` | A script that generates or checks migrations with it |
+| `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `InvalidTransitionError` in `src/server/http/errors.ts` | Part of the PLAN.md §9.7 taxonomy | Used from Phase 1 (auth, RBAC, stage machines) |
 
 No infrastructure service is dormant: the only external service is Postgres, which the readiness check, the migration runner and the job queue all use.
