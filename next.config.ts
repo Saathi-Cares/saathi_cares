@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
+  agentRules: false,
   serverExternalPackages: ['pg', 'pg-boss', 'pino'],
   images: { deviceSizes: [360, 640, 828, 1080, 1600], minimumCacheTTL: 60 * 60 * 24 },
   async headers() {
