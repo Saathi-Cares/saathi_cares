@@ -18,8 +18,15 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
 
 export const logger: Logger = createLogger({ level: process.env.LOG_LEVEL ?? 'info' });
 
+// Only the object payload is redacted. Message text and child bindings (request_id, user_id)
+// are written as-is and must never carry patient data.
 /** Request-bound child when called inside runWithRequestContext, otherwise the root logger. */
 export function getLogger(): Logger {
+  return getLoggerFrom(logger);
+}
+
+/** Same as getLogger, but over a given root; exported so tests can capture output. */
+export function getLoggerFrom(root: Logger): Logger {
   const ctx = getRequestContext();
-  return ctx ? logger.child({ request_id: ctx.requestId, user_id: ctx.userId }) : logger;
+  return ctx ? root.child({ request_id: ctx.requestId, user_id: ctx.userId }) : root;
 }

@@ -44,18 +44,27 @@ export const REDACTED_KEYS: ReadonlySet<string> = new Set([
 const CENSOR = '[redacted]';
 
 export function redactDeep<T>(value: T): T {
-  return walk(value, new WeakSet()) as T;
+  return walk(value, new Set()) as T;
 }
 
-function walk(value: unknown, seen: WeakSet<object>): unknown {
+/** `ancestors` holds only the objects on the current path, so shared (non-cyclic) references are walked in full. */
+function walk(value: unknown, ancestors: Set<object>): unknown {
   if (value === null || typeof value !== 'object') return value;
-  if (seen.has(value)) return '[circular]';
-  seen.add(value);
-  if (Array.isArray(value)) return value.map((v) => walk(v, seen));
-  if (value instanceof Error) return { name: value.name, message: value.message, stack: value.stack };
-  const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(value)) {
-    out[key] = REDACTED_KEYS.has(key.toLowerCase()) ? CENSOR : walk(v, seen);
+  if (value instanceof Date) return value;
+  if (value instanceof Uint8Array) return `[binary ${value.byteLength} bytes]`;
+  if (ancestors.has(value)) return '[circular]';
+  ancestors.add(value);
+  try {
+    if (value instanceof Error) return { name: value.name, message: value.message, stack: value.stack };
+    if (Array.isArray(value)) return value.map((v) => walk(v, ancestors));
+    if (value instanceof Set) return Array.from(value).map((v) => walk(v, ancestors));
+    const entries = value instanceof Map ? Object.entries(Object.fromEntries(value)) : Object.entries(value);
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of entries) {
+      out[key] = REDACTED_KEYS.has(key.toLowerCase()) ? CENSOR : walk(v, ancestors);
+    }
+    return out;
+  } finally {
+    ancestors.delete(value);
   }
-  return out;
 }
