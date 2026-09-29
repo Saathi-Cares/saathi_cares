@@ -94,6 +94,10 @@ const PG_STATEMENT_TIMEOUT = '57014';
 
 type PgLikeError = Error & { code?: string; constraint?: string; column?: string };
 
+function constraintDetails(pg: PgLikeError, message: string): ErrorDetail[] | undefined {
+  return pg.constraint ? [{ path: pg.constraint, message }] : undefined;
+}
+
 /** Translate node-postgres errors into domain errors; returns undefined if not a pg error. */
 export function fromPgError(err: unknown): AppError | undefined {
   if (!(err instanceof Error)) return undefined;
@@ -101,14 +105,14 @@ export function fromPgError(err: unknown): AppError | undefined {
   if (typeof pg.code !== 'string') return undefined;
   switch (pg.code) {
     case PG_UNIQUE:
-      return new ConflictError(
-        `Already exists (${pg.constraint ?? 'unique constraint'})`,
-        pg.constraint ? [{ path: pg.constraint, message: 'must be unique' }] : undefined,
-      );
+      return new ConflictError('Already exists', constraintDetails(pg, 'must be unique'));
     case PG_FK:
-      return new ValidationError(`Referenced record does not exist (${pg.constraint ?? 'foreign key'})`);
+      return new ValidationError(
+        'Referenced record does not exist',
+        constraintDetails(pg, 'must reference an existing record'),
+      );
     case PG_CHECK:
-      return new ValidationError(`Value violates ${pg.constraint ?? 'a check constraint'}`);
+      return new ValidationError('Value not allowed', constraintDetails(pg, 'value not allowed'));
     case PG_SERIALIZATION:
       return new ConflictError('Concurrent update; retry the request');
     case PG_STATEMENT_TIMEOUT:
@@ -116,6 +120,16 @@ export function fromPgError(err: unknown): AppError | undefined {
     default:
       return undefined;
   }
+}
+
+/** The message safe to send to the client; external service internals stay on the error for logs. */
+function clientMessage(err: AppError): string {
+  if (err instanceof ExternalServiceError) {
+    return err.retryable
+      ? `${err.service} is temporarily unavailable; please retry`
+      : `${err.service} request failed`;
+  }
+  return err.message;
 }
 
 export function toErrorResponse(
@@ -129,7 +143,7 @@ export function toErrorResponse(
     body: {
       error: {
         code: appError.code,
-        message: appError.message,
+        message: clientMessage(appError),
         ...(appError.details ? { details: appError.details } : {}),
         request_id: requestId,
       },

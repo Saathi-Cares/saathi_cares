@@ -23,9 +23,31 @@ describe('toErrorResponse', () => {
   });
 
   it('marks retryable external errors with 503 and Retry-After semantics', () => {
-    const r = toErrorResponse(new ExternalServiceError('smtp', 'timeout', { retryable: true }), 'req-3');
+    const err = new ExternalServiceError('smtp', 'timeout', { retryable: true });
+    const r = toErrorResponse(err, 'req-3');
+    expect(err.retryable).toBe(true);
     expect(r.status).toBe(503);
     expect(r.body.error.code).toBe('EXTERNAL_SERVICE_UNAVAILABLE');
+  });
+
+  it('does not leak the internal message of an external service error', () => {
+    const err = new ExternalServiceError('storage', 'Media root is not writable: /data/media', {
+      retryable: true,
+    });
+    const r = toErrorResponse(err, 'req-4');
+    expect(r.body.error.message).toBe('storage is temporarily unavailable; please retry');
+    expect(r.body.error.message).not.toContain('/data/media');
+    expect(err.message).toBe('Media root is not writable: /data/media');
+  });
+
+  it('gives a generic message for non-retryable external service errors', () => {
+    const r = toErrorResponse(
+      new ExternalServiceError('sms', 'provider said: bad key abc', { retryable: false }),
+      'req-5',
+    );
+    expect(r.status).toBe(502);
+    expect(r.body.error.code).toBe('EXTERNAL_SERVICE_FAILED');
+    expect(r.body.error.message).toBe('sms request failed');
   });
 });
 
@@ -34,7 +56,20 @@ describe('fromPgError', () => {
     const pgErr = Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'users_email_key' });
     const mapped = fromPgError(pgErr);
     expect(mapped).toBeInstanceOf(ConflictError);
-    expect(mapped?.message).toContain('users_email_key');
+    expect(mapped?.details?.[0]?.path).toBe('users_email_key');
+    expect(mapped?.message).not.toContain('users_email_key');
+  });
+
+  it('keeps foreign key and check constraint names out of the message but in details', () => {
+    const fk = fromPgError(Object.assign(new Error('fk'), { code: '23503', constraint: 'orders_user_fk' }));
+    expect(fk).toBeInstanceOf(ValidationError);
+    expect(fk?.message).toBe('Referenced record does not exist');
+    expect(fk?.details?.[0]?.path).toBe('orders_user_fk');
+
+    const check = fromPgError(Object.assign(new Error('chk'), { code: '23514', constraint: 'age_positive' }));
+    expect(check).toBeInstanceOf(ValidationError);
+    expect(check?.message).toBe('Value not allowed');
+    expect(check?.details?.[0]?.path).toBe('age_positive');
   });
 
   it('returns undefined for non-pg errors', () => {
