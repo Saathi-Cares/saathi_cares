@@ -38,8 +38,13 @@ export class LocalStorageAdapter implements StorageAdapter {
     });
     const source = Buffer.isBuffer(data) ? Readable.from(data) : data;
     const tmp = `${full}.${randomUUID()}.tmp`;
-    await pipeline(source, counter, createWriteStream(tmp));
-    await fs.rename(tmp, full); // atomic on the same filesystem: readers never see a partial file
+    try {
+      await pipeline(source, counter, createWriteStream(tmp));
+      await fs.rename(tmp, full); // atomic on the same filesystem: readers never see a partial file
+    } catch (err) {
+      await fs.rm(tmp, { force: true }); // never leave a partial upload behind
+      throw err;
+    }
     return { bytes, sha256: hash.digest('hex') };
   }
 

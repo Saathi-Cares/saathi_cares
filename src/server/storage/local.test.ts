@@ -39,11 +39,28 @@ describe('LocalStorageAdapter', () => {
     expect(await fs.readdir(root)).toEqual([]);
   });
 
-  it('probeWritable throws a retryable ExternalServiceError when the root is not writable', async () => {
-    const unwritable = new LocalStorageAdapter(path.join(root, 'missing', 'deeper'));
-    await fs.mkdir(path.join(root, 'missing'), { recursive: true });
-    await fs.chmod(path.join(root, 'missing'), 0o500);
-    if (process.platform === 'win32') return; // chmod is advisory on Windows; CI (Linux) exercises this branch
-    await expect(unwritable.probeWritable()).rejects.toMatchObject({ service: 'storage', retryable: true });
+  it('removes the temp file and rethrows when the source stream fails midway', async () => {
+    const boom = new Error('source failed midway');
+    async function* failing(): AsyncGenerator<Buffer> {
+      yield Buffer.from('partial');
+      throw boom;
+    }
+    await expect(
+      storage.put('private/f.txt', Readable.from(failing()), { contentType: 'text/plain' }),
+    ).rejects.toBe(boom);
+    const entries = await fs.readdir(root, { recursive: true });
+    expect(entries.filter((e) => e.endsWith('.tmp'))).toEqual([]);
+    expect(await storage.exists('private/f.txt')).toBe(false);
   });
+
+  // chmod is advisory on Windows; CI (Linux) exercises this test
+  it.skipIf(process.platform === 'win32')(
+    'probeWritable throws a retryable ExternalServiceError when the root is not writable',
+    async () => {
+      const unwritable = new LocalStorageAdapter(path.join(root, 'missing', 'deeper'));
+      await fs.mkdir(path.join(root, 'missing'), { recursive: true });
+      await fs.chmod(path.join(root, 'missing'), 0o500);
+      await expect(unwritable.probeWritable()).rejects.toMatchObject({ service: 'storage', retryable: true });
+    },
+  );
 });
