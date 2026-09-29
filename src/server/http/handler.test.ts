@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 vi.mock('../db/client', () => {
@@ -10,16 +10,26 @@ vi.mock('../db/client', () => {
   return { getDb: () => db };
 });
 
-// Keep test output clean: the real root logger writes JSON lines to stdout.
-vi.mock('../observability/logger', () => {
-  const noop = () => undefined;
-  return { getLogger: () => ({ info: noop, warn: noop, error: noop }) };
+// Capture log lines instead of writing them to stdout, so the log contract can be asserted.
+const { lines } = vi.hoisted(() => ({ lines: [] as string[] }));
+
+vi.mock('../observability/logger', async () => {
+  const actual = await vi.importActual<typeof import('../observability/logger')>('../observability/logger');
+  const captured = actual.createLogger({
+    level: 'info',
+    destination: { write: (s: string) => lines.push(s) },
+  });
+  return { ...actual, getLogger: () => captured };
 });
 
 import { withHandler } from './handler';
 import { ExternalServiceError, NotFoundError, RateLimitedError } from './errors';
 
 const routeCtx = { params: Promise.resolve({ id: '42' }) };
+
+beforeEach(() => {
+  lines.length = 0;
+});
 
 describe('withHandler', () => {
   it('validates the body and passes params, request id and a transaction for POST', async () => {
@@ -131,5 +141,43 @@ describe('withHandler', () => {
     const res = await handler(new Request('http://t/x'), routeCtx);
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('5');
+  });
+
+  it('logs one success line with route, method, status and duration but never the body', async () => {
+    const secret = 'zq-distinctive-body-value';
+    const handler = withHandler(
+      { permission: 'public', body: z.object({ name: z.string() }) },
+      async (ctx) => ({ status: 201, data: { ok: ctx.body.name.length > 0 } }),
+    );
+    await handler(
+      new Request('http://t/api/v1/x', {
+        method: 'POST',
+        body: JSON.stringify({ name: secret }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      routeCtx,
+    );
+    expect(lines).toHaveLength(1);
+    const line = lines[0] ?? '';
+    const entry = JSON.parse(line);
+    expect(entry.msg).toBe('request');
+    expect(entry.route).toBe('/api/v1/x');
+    expect(entry.method).toBe('POST');
+    expect(entry.status).toBe(201);
+    expect(typeof entry.duration_ms).toBe('number');
+    expect(entry).not.toHaveProperty('body');
+    expect(line).not.toContain(secret);
+  });
+
+  it('logs a failure line with status and the error', async () => {
+    const handler = withHandler({ permission: 'public' }, async () => {
+      throw new NotFoundError('Patient');
+    });
+    await handler(new Request('http://t/x'), routeCtx);
+    expect(lines).toHaveLength(1);
+    const entry = JSON.parse(lines[0] ?? '');
+    expect(entry.msg).toBe('request failed');
+    expect(entry.status).toBe(404);
+    expect(entry.err.message).toBe('Patient not found');
   });
 });
