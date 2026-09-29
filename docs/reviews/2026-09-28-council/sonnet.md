@@ -1,0 +1,64 @@
+# Architecture Review — SaathiCares PLAN.md — Claude Sonnet
+
+Baseline: current repo is a frontend-only React SPA with localStorage as its "database" (ARCHITECTURE_AUDIT.md §1, §6) — no backend exists today. The plan is not incremental hardening, it's a from-scratch build of a full production stack. That context matters: some ambition is justified by the PHI/money stakes, but the plan consistently reaches for the multi-host-scale answer to single-host-scale problems.
+
+## 1. Verdict table
+
+| Component | Verdict | Reason | Cost of keeping |
+|---|---|---|---|
+| Next.js single process (§4, D2) | KEEP | One deploy, RSC fixes SEO gap | sunk cost |
+| Drizzle ORM (§5) | KEEP | Typed SQL, no engine binary | low |
+| Postgres 16, single instance (§5,§8) | KEEP | One system of record | core, already counted |
+| pg-boss (§6 D8) | KEEP | Right call vs Kafka/BullMQ | low |
+| Separate worker container (§4.1,§15.2) | SIMPLIFY | Run pg-boss consumer in-process; job volume is tens/day | saves ~150–250MB RAM, ~0.5 dev-day |
+| MinIO (§5,§15.2) | CUT / DEFER-until-multi-node | S3 semantics unneeded for GBs of media on one box; AGPL + a whole service to patch | saves ~250–400MB RAM, ~2 dev-days; use a bind-mounted volume served by Nginx |
+| Loki + Promtail (§4.1,§14.1) | CUT / DEFER-until-multi-host | pino→file + logrotate + `grep`/`jq` is enough for one VPS | saves ~300–400MB RAM, ~2 dev-days |
+| Prometheus+Grafana+exporters (§5,§14) | SIMPLIFY | Keep Prometheus+Grafana+postgres_exporter; drop nginx-exporter and full Loki stack; push rest to Phase 6 | saves ~200MB RAM, ~2–3 dev-days now |
+| GlitchTip (§5,§15.2) | CUT for v1 | Redundant with logs+Grafana alerts at this volume | saves a Postgres schema + service |
+| Uptime Kuma (§5,§15.2) | KEEP | Cheap, real external check + status page | ~50–80MB RAM |
+| TOTP MFA (§5,§10.1) | KEEP | Proportionate given PHI+money, privileged roles only | ~1 dev-day |
+| Testcontainers (§17) | SIMPLIFY | GH Actions `services: postgres` does the same job with less library surface | saves ~0.5 dev-day |
+| Playwright e2e "nightly full" (§17,§18) | SIMPLIFY | Keep a small PR smoke subset; broad e2e is where solo devs bleed hours to flakiness | saves ongoing maintenance, not setup |
+| k6 perf gates per phase (§17,§18) | CUT / DEFER-until-Grafana-signal | §12.4 itself says the box is "comfortably over-provisioned"; §19 already has real triggers | saves ~2–3 dev-days + recurring CI cost |
+| OpenAPI generation (§9.6) | DEFER-until-external-consumer | D2: no non-browser clients exist | saves ~2–3 dev-days + CI diff step |
+| Monthly restore-test workflow (§15.5,§16.4) | KEEP | Only real proof backups work for PHI/money | ~1 dev-day, cheap CI job |
+| Staging environment (§15.4) | SIMPLIFY | Don't run it always-on next to prod on the same 4GB box; ephemeral or a second cheap VPS | avoids RAM contention with prod |
+| Trivy scanning (§11,§16.2) | KEEP | CI-only, near-zero runtime cost | ~0 |
+| Keyset pagination everywhere (§9.3,§12.2) | KEEP | Cheap to do right from day one | ~0 incremental |
+| Optimistic concurrency "everywhere" (§12.2) | SIMPLIFY | Scope to CMS sections + encounters under concurrent edit, not every table | trivial either way |
+| Authz matrix test (§17) | KEEP | Highest-value test in the plan given permission-based RBAC + PHI | ~1–2 dev-days, pays for itself |
+| Separate DB roles (§8.8) | KEEP | Near-zero cost, real blast-radius reduction | ~0 |
+| Read-only container FS (§11,§15.2) | KEEP | One Docker flag | ~0 |
+| Nightly report snapshots (§12.3,§13.1) | KEEP | Correct caching choice for a dashboard | low |
+| Cloudflare (§5,§20) | KEEP | Free, reversible, already flagged optional | ~0 |
+| argon2id params (§5,§10.1) | KEEP | Correctly sized for the threat model | ~0 |
+| audit_log partitioning (§8.1,§19) | KEEP as-deferred | Good example of correct thresholding already in the plan | 0 now |
+| Separate `migrate` container (§15.2) | SIMPLIFY | Fold into app entrypoint with an advisory lock instead of a 4th container | saves ~0.5 dev-day |
+| ESLint import-boundary rules (§4.3,§7) | KEEP | Config-only; the one thing stopping a solo dev's architecture from eroding | ~0 |
+| Custom session/password/MFA auth (§5,§10) | SIMPLIFY | Hand-rolled auth is exactly where a solo dev introduces a subtle, catastrophic bug (session fixation, MFA bypass edge cases). Use a maintained library (Lucia/oslo or similar) for the plumbing, hand-roll only RBAC | the ~1 dev-day "saved" by not using a library is dwarfed by the risk |
+| CMS version-diff/rollback UI (§8.2, Phase 2) | SIMPLIFY | audit_log already has before/after; a dedicated diff+rollback screen is extra surface for a few edits/month | saves ~2–3 dev-days |
+| 80% coverage target (§17) | CUT | Vanity metric; require tests for state machines/permissions/money paths (already listed) instead | saves chasing coverage on UI glue |
+
+## 2. Minimum viable production v1
+
+Compose services, nothing more: **nginx · app (Next.js, HTTP + in-process pg-boss consumer + migration-on-boot with advisory lock) · postgres · backup (cron: pg_dump + restic offsite) · uptime-kuma**. Media on a bind-mounted volume served via Nginx, not MinIO. Add Prometheus+Grafana+postgres_exporter as a 3-service "observability-lite" profile once Phase 1 is stable, not before. This still gives argon2id+MFA auth, server-enforced RBAC, append-only audit log, encrypted offsite backups with a tested restore, TLS+security headers, and DB-role blast-radius limits — everything actually load-bearing for PHI/money, at roughly a third of the container count.
+
+## 3. Under-engineered
+
+- **Hand-rolled auth (§10)** for PHI+money, built by one part-time developer with no security review budget, is a bigger risk than any of the "over-engineering" — this is the one place to spend the saved dev-days, not cut them.
+- **Data retention/purge (§20 Q7)** is left as an open question threaded to review, but patients are registered starting Phase 3; a retention/erasure policy (relevant under India's DPDP Act for health data) needs to exist before that, not after. The schema only supports merge/archive, no purge path.
+- **PAN numbers (§8.6 `donors.pan`)** for 80G receipts are stored with no column-level encryption mentioned, unlike `mfa_secret_enc`'s explicit `bytea` encryption — inconsistent treatment of sensitive PII.
+- **Disk-level encryption** of the live `pgdata` volume isn't mentioned (only backups are described as encrypted via restic) — cheap control, missing for a box holding patient records.
+- **Rate limiting (§4.2)** only names `/auth/login`, `/enquiries`, `/donations` — patient search/read endpoints have no enumeration/scraping protection specified.
+
+## 4. Phase plan critique
+
+Total: 28 "half-time" weeks (§18) before go-live even nominally starts, and real launch (old site decommission) waits until *after* Donations (Phase 4) and Reporting (Phase 5) — meaning the platform runs in parallel with the no-code site for ~5+ months longer than necessary. For a solo part-time dev, Phase 3 (HMIS, 8 weeks for state machine + dedup + tablet UX + referrals + CSV import + e2e + k6 gate) is the least credible estimate in the document; budget 12–16 weeks. Phase 6 crams observability, a full ASVS L2 pass, DR rehearsal, and go-live into 3 weeks at the *end* of a 6+ month solo effort — highest-risk moment to compress. **Reorder:** decouple public-site cutover from full-platform cutover — go live on the new site after Phase 2 (CMS/enquiries), run Phase 3 (HMIS) in parallel on staging without blocking the public cutover, and push Donations/Reporting to run *after* or *alongside* HMIS rather than gating final launch. Spread hardening (backup tests, basic dashboards, Trivy) across every phase instead of one terminal phase.
+
+## 5. Top 5 changes, ranked
+
+1. **Cut MinIO and Loki/Promtail for v1** — biggest RAM/complexity win on a 4GB box, ~600–800MB and ~4 dev-days recovered, replace with a media volume + file logs.
+2. **Decouple public-site launch from full-platform launch** — stop running the old no-code site 5+ months longer than needed; ship the CMS/site after Phase 2.
+3. **Replace the hand-rolled auth module with a maintained session/MFA library** — the plan's own stated risk profile (PHI+money) argues against solo-built auth plumbing.
+4. **Drop the k6 phase-exit gates and OpenAPI generation for v1** — §19 already has real, Grafana-driven thresholds for exactly these; don't pre-build the response to a problem that isn't happening yet.
+5. **Collapse worker + migrate into the app container, and de-couple staging from prod's RAM budget** — fewer containers competing for the same 4GB, without losing any of the safety properties (transactional job enqueue, migration-before-serve) that actually matter.
