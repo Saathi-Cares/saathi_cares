@@ -26,12 +26,12 @@ If port 8080 is busy, run `npm run dev -- --port 8081`.
 
 ## Scripts
 
-| Command           | What it does                         |
-| ----------------- | ------------------------------------ |
-| `npm run dev`     | Start the dev server with hot reload |
-| `npm run build`   | Production build to `dist/`          |
-| `npm run preview` | Serve the production build locally   |
-| `npm run lint`    | Run ESLint                           |
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the dev server with hot reload |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Serve the production build locally |
+| `npm run lint` | Run ESLint |
 
 ## Project layout
 

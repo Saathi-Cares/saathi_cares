@@ -4,54 +4,53 @@
 
 ## 1. Verdicts
 
-| Component                                         | Verdict                                                                   | Reason                                                                                             | Cost of keeping |
-| ------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------- |
-| Next.js, Drizzle, PG16 (§5)                       | KEEP                                                                      | Boring and fits the constraints                                                                    | —               |
-| Loki + Promtail (§14.1)                           | CUT                                                                       | Promtail is past end-of-life (replaced by Alloy). `docker logs` with json-file rotation is enough. | 2d, ~350 MB     |
-| Prometheus + Grafana + exporters (§14.2–14.4)     | DEFER until a 2nd app replica or the first slowdown nobody can explain    | Five dashboards nobody will watch. Cron checks cover the alerts.                                   | 4–6d, ~600 MB   |
-| GlitchTip                                         | DEFER until more than ~10 errors/day                                      | Needs its own PG, Valkey and worker                                                                | 1d, ~800 MB     |
-| Uptime Kuma on the VPS                            | SIMPLIFY: run it off-box                                                  | It cannot report its own host going down                                                           | 150 MB          |
-| MinIO (§8.3)                                      | CUT                                                                       | 2 GB of files. MinIO community edition no longer ships images. Use a local volume served by Nginx. | 3d, ~300 MB     |
-| Presigned upload + variants job                   | CUT                                                                       | Upload through the app, run sharp inline, let next/image resize                                    | 2d              |
-| pg-boss                                           | KEEP                                                                      | Transactional email and receipts                                                                   | 1d              |
-| Separate worker container                         | SIMPLIFY: run in-process until PDFs or exports slow requests              | Only a few jobs a day                                                                              | 150 MB          |
-| Custom session auth                               | SIMPLIFY: Better Auth (DB sessions, revocable, TOTP plugin)               | "300 lines" is really ~2 weeks once invite, reset, lockout and recovery codes are in               | 6–8d            |
-| TOTP MFA                                          | KEEP                                                                      | Patient data and money                                                                             | incl.           |
-| argon2 at 64 MiB                                  | SIMPLIFY to 19 MiB, t=2 (OWASP)                                           | 6 parallel logins ≈ 400 MB in a 512 MB container                                                   | 0               |
-| HIBP check                                        | KEEP                                                                      | Cheap                                                                                              | 0.5d            |
-| Permission cache + roles_version (§12.3)          | CUT                                                                       | The query takes ~1 ms                                                                              | 0.5d            |
-| Separate DB roles (§8.8)                          | KEEP owner/app, CUT readonly                                              | Enforces D13 cheaply                                                                               | 0.5d            |
-| Separate migrate container                        | KEEP                                                                      | Trivial, and keeps owner credentials isolated                                                      | 0.2d            |
-| Read-only root FS                                 | KEEP (mount `.next/cache` writable)                                       | Cheap                                                                                              | 0.5d            |
-| Trivy                                             | KEEP, non-blocking, weekly                                                | Base-image CVE noise would otherwise block deploys                                                 | 0.5d            |
-| gitleaks / npm audit / Dependabot                 | KEEP; Dependabot monthly and grouped                                      | Weekly PR churn is too much for one dev                                                            | —               |
-| certbot sidecar                                   | CUT: Cloudflare Origin CA cert                                            | 15-year cert, one fewer moving part                                                                | saves 1d        |
-| Cloudflare proxy                                  | KEEP                                                                      | Free DDoS/WAF/Turnstile. Configure `real_ip` or the Nginx rate limits will be wrong.               | 0.5d            |
-| Testcontainers                                    | SIMPLIFY: GitHub Actions Postgres service, no MinIO                       | Same coverage                                                                                      | 1d              |
-| Authz matrix test                                 | KEEP                                                                      | The most valuable test in the plan                                                                 | 3d              |
-| Playwright on every PR                            | SIMPLIFY: 4 flows, run on main/nightly                                    | Too much of a tax for a solo dev                                                                   | 3d + upkeep     |
-| k6                                                | CUT                                                                       | Camps have 5–10 tablets, not 50                                                                    | 2d per phase    |
-| OpenAPI gen + diff + /admin/docs + Postman        | CUT                                                                       | D2 says there are no external clients                                                              | 2d + upkeep     |
-| N+1 counter, explain.ts, weekly VACUUM            | CUT                                                                       | 20k rows; autovacuum handles it                                                                    | 2d              |
-| Keyset pagination everywhere                      | SIMPLIFY: offset for admin lists, keyset only on audit_log                | Staff want page numbers                                                                            | 2d              |
-| Optimistic concurrency                            | SIMPLIFY: CMS sections and encounters only                                | Only places with real concurrent edits                                                             | 1d              |
-| Idempotency keys                                  | KEEP (encounters, donations)                                              | Field retries and money                                                                            | 1d              |
-| D6 "no Server Actions"                            | SIMPLIFY: allow them through the same `withHandler` wrapper               | Halves mutation boilerplate                                                                        | 5d+             |
-| Nightly report_snapshots                          | CUT                                                                       | 40k rows aggregate live in milliseconds                                                            | 3d              |
-| audit_log partitioning (Phase 6)                  | CUT                                                                       | 200k rows, and it contradicts §19's own 5M trigger                                                 | 2d              |
-| pgBackRest WAL                                    | DEFER until DB > 5 GB                                                     | `pg_dump` every 6 h gives RPO 6 h for free                                                         | 2d              |
-| Staging on the prod box                           | SIMPLIFY: small PG, synthetic seed, started on demand; CUT the anonymiser | Doubles PG memory, and the anonymiser is itself a PHI risk                                         | 2d, ~800 MB     |
-| Restore test in GitHub Actions                    | SIMPLIFY: run it on the backup host                                       | Otherwise PHI and the restic key go onto GitHub runners                                            | 1d              |
-| PR review + release-please + Conventional Commits | CUT to trunk + tags                                                       | Ceremony for one person                                                                            | ongoing         |
-| ESLint per-module boundaries                      | SIMPLIFY: `server-only` + one rule                                        | Enough to stop the real mistake                                                                    | 1d              |
-| 80% coverage, TDD mandate, per-phase ADR retros   | SIMPLIFY                                                                  | Too much ongoing cost                                                                              | ongoing         |
-| ASVS L2                                           | SIMPLIFY to a 20-item checklist                                           | Full L2 is too much                                                                                | 3d              |
-| 8 runbooks                                        | SIMPLIFY to 3 (host, deploy/rollback, DR)                                 | The others won't be maintained                                                                     | 2d              |
+| Component | Verdict | Reason | Cost of keeping |
+|---|---|---|---|
+| Next.js, Drizzle, PG16 (§5) | KEEP | Boring and fits the constraints | — |
+| Loki + Promtail (§14.1) | CUT | Promtail is past end-of-life (replaced by Alloy). `docker logs` with json-file rotation is enough. | 2d, ~350 MB |
+| Prometheus + Grafana + exporters (§14.2–14.4) | DEFER until a 2nd app replica or the first slowdown nobody can explain | Five dashboards nobody will watch. Cron checks cover the alerts. | 4–6d, ~600 MB |
+| GlitchTip | DEFER until more than ~10 errors/day | Needs its own PG, Valkey and worker | 1d, ~800 MB |
+| Uptime Kuma on the VPS | SIMPLIFY: run it off-box | It cannot report its own host going down | 150 MB |
+| MinIO (§8.3) | CUT | 2 GB of files. MinIO community edition no longer ships images. Use a local volume served by Nginx. | 3d, ~300 MB |
+| Presigned upload + variants job | CUT | Upload through the app, run sharp inline, let next/image resize | 2d |
+| pg-boss | KEEP | Transactional email and receipts | 1d |
+| Separate worker container | SIMPLIFY: run in-process until PDFs or exports slow requests | Only a few jobs a day | 150 MB |
+| Custom session auth | SIMPLIFY: Better Auth (DB sessions, revocable, TOTP plugin) | "300 lines" is really ~2 weeks once invite, reset, lockout and recovery codes are in | 6–8d |
+| TOTP MFA | KEEP | Patient data and money | incl. |
+| argon2 at 64 MiB | SIMPLIFY to 19 MiB, t=2 (OWASP) | 6 parallel logins ≈ 400 MB in a 512 MB container | 0 |
+| HIBP check | KEEP | Cheap | 0.5d |
+| Permission cache + roles_version (§12.3) | CUT | The query takes ~1 ms | 0.5d |
+| Separate DB roles (§8.8) | KEEP owner/app, CUT readonly | Enforces D13 cheaply | 0.5d |
+| Separate migrate container | KEEP | Trivial, and keeps owner credentials isolated | 0.2d |
+| Read-only root FS | KEEP (mount `.next/cache` writable) | Cheap | 0.5d |
+| Trivy | KEEP, non-blocking, weekly | Base-image CVE noise would otherwise block deploys | 0.5d |
+| gitleaks / npm audit / Dependabot | KEEP; Dependabot monthly and grouped | Weekly PR churn is too much for one dev | — |
+| certbot sidecar | CUT: Cloudflare Origin CA cert | 15-year cert, one fewer moving part | saves 1d |
+| Cloudflare proxy | KEEP | Free DDoS/WAF/Turnstile. Configure `real_ip` or the Nginx rate limits will be wrong. | 0.5d |
+| Testcontainers | SIMPLIFY: GitHub Actions Postgres service, no MinIO | Same coverage | 1d |
+| Authz matrix test | KEEP | The most valuable test in the plan | 3d |
+| Playwright on every PR | SIMPLIFY: 4 flows, run on main/nightly | Too much of a tax for a solo dev | 3d + upkeep |
+| k6 | CUT | Camps have 5–10 tablets, not 50 | 2d per phase |
+| OpenAPI gen + diff + /admin/docs + Postman | CUT | D2 says there are no external clients | 2d + upkeep |
+| N+1 counter, explain.ts, weekly VACUUM | CUT | 20k rows; autovacuum handles it | 2d |
+| Keyset pagination everywhere | SIMPLIFY: offset for admin lists, keyset only on audit_log | Staff want page numbers | 2d |
+| Optimistic concurrency | SIMPLIFY: CMS sections and encounters only | Only places with real concurrent edits | 1d |
+| Idempotency keys | KEEP (encounters, donations) | Field retries and money | 1d |
+| D6 "no Server Actions" | SIMPLIFY: allow them through the same `withHandler` wrapper | Halves mutation boilerplate | 5d+ |
+| Nightly report_snapshots | CUT | 40k rows aggregate live in milliseconds | 3d |
+| audit_log partitioning (Phase 6) | CUT | 200k rows, and it contradicts §19's own 5M trigger | 2d |
+| pgBackRest WAL | DEFER until DB > 5 GB | `pg_dump` every 6 h gives RPO 6 h for free | 2d |
+| Staging on the prod box | SIMPLIFY: small PG, synthetic seed, started on demand; CUT the anonymiser | Doubles PG memory, and the anonymiser is itself a PHI risk | 2d, ~800 MB |
+| Restore test in GitHub Actions | SIMPLIFY: run it on the backup host | Otherwise PHI and the restic key go onto GitHub runners | 1d |
+| PR review + release-please + Conventional Commits | CUT to trunk + tags | Ceremony for one person | ongoing |
+| ESLint per-module boundaries | SIMPLIFY: `server-only` + one rule | Enough to stop the real mistake | 1d |
+| 80% coverage, TDD mandate, per-phase ADR retros | SIMPLIFY | Too much ongoing cost | ongoing |
+| ASVS L2 | SIMPLIFY to a 20-item checklist | Full L2 is too much | 3d |
+| 8 runbooks | SIMPLIFY to 3 (host, deploy/rollback, DR) | The others won't be maintained | 2d |
 
 ## 2. Minimum viable production v1
 
 Services in `compose.yaml`:
-
 - `nginx`: Cloudflare Origin cert, rate limits, serves `/media` from a volume
 - `app`: Next.js with pg-boss in-process, 768 MB limit
 - `postgres`: shared_buffers 512 MB, 1.2 GB limit
@@ -75,10 +74,9 @@ That is about 1.6 GB resident. Off-box: Uptime Kuma on the restic target host.
 
 The total is about 28 weeks at half time, which I think is 1.6–2× optimistic.
 
-Order is the bigger problem. The public site already works on no-code; the real pain is patient data in spreadsheets. Yet nothing reaches production until Phase 6 (~7 months), and backups, alerting and the security pass come _after_ HMIS instead of before the first real patient record.
+Order is the bigger problem. The public site already works on no-code; the real pain is patient data in spreadsheets. Yet nothing reaches production until Phase 6 (~7 months), and backups, alerting and the security pass come *after* HMIS instead of before the first real patient record.
 
 Proposed order:
-
 1. **P0 (3w):** infra plus backups, restore and off-box monitoring.
 2. **P1 (2w):** auth library, RBAC, audit, authz test.
 3. **P3a/b (6w):** pilot at one real camp.

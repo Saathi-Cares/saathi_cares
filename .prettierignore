@@ -1,0 +1,10 @@
+*.md
+.next/
+dist/
+node_modules/
+package-lock.json
+.superpowers/
+media/
+.test-media/
+playwright-report/
+test-results/
