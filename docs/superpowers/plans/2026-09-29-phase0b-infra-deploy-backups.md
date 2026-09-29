@@ -94,7 +94,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM base AS runner
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 MIGRATIONS_DIR=/app/dist/migrations
+# NEXT_MANUAL_SIG_HANDLE=true stops Next's own SIGTERM/SIGINT handler from calling process.exit before
+# src/server/boot.ts has drained jobs and closed the pool (Phase 0A Task 9 finding).
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 MIGRATIONS_DIR=/app/dist/migrations NEXT_MANUAL_SIG_HANDLE=true
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 --ingroup nodejs nextjs \
  && apk add --no-cache wget
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
