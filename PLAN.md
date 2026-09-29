@@ -1510,7 +1510,6 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 11. **Languages for the voice agent (Phase 6).** Hindi and English assumed; are Marathi or others needed at the camps the organisation serves?
 12. **Human fallback (Phase 6).** Who receives the voicemail/human-requested tasks and by when must they call back?
 13. **Unmatched callers (Phase 6).** Drafts whose phone number never appears at a camp: keep 90 days then delete (proposed), or contact them?
-7. **Consent wording and retention period.** Not required by the organisation today; the recommendation in D23 stands. Note that a tobacco cessation programme and an oral cancer surveillance list hold data over months to years, which makes a retention decision more useful sooner.
 
 ---
 
