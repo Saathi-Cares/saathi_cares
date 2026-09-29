@@ -2,38 +2,38 @@
 
 Status: **draft for review, revision 4** (clinical model rewritten; simplified after the three-model council review in §22; product owner's answers applied in §20.1; oral cancer and tobacco cessation programmes, AI screening phase and engineering standards added 2026-09-29) · Author: Abhinav Goyal with Claude · First draft 2026-09-28, revised 2026-09-29 · Supersedes: `ARCHITECTURE_AUDIT.md` §12 (next steps)
 
-This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
+This document is the single source of truth for _what_ we are building, _how_ it is structured, and _in which order_ it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose _not_ to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
 
 ## 0. How to read this document
 
-| Section | Answers |
-| --- | --- |
-| 1–2 | What are we building, for whom, under what constraints |
+| Section  | Answers                                                                               |
+| -------- | ------------------------------------------------------------------------------------- |
+| 1–2      | What are we building, for whom, under what constraints                                |
 | 8.5, 8.9 | The clinical care pathway model and the patient data privacy model (the product core) |
-| 9.7 | Exception handling contract |
-| 3 | Where the codebase is today and what we keep |
-| 4 | The target architecture, layer by layer, with the request path |
-| 5 | The technology stack and why each piece was chosen |
-| 6 | Decisions we made, including what we deliberately rejected |
-| 7 | Repository layout |
-| 8 | Data model: every table, key columns, indexes, constraints |
-| 9 | API design contract |
-| 10 | Authentication, authorisation, roles and permissions |
-| 11 | Security controls, layer by layer |
-| 12 | Data retrieval, search, caching and database performance strategy |
-| 13 | Background jobs and asynchronous work |
-| 14 | Observability: logs, metrics, alerts |
-| 15 | Infrastructure, containers, environments, backups |
-| 16 | CI/CD and Git workflow |
-| 17 | Testing strategy |
-| 18 | Delivery phases with features, deliverables and exit criteria |
-| 19 | Scale thresholds: when to turn on the things we left off |
-| 20 | Risks and open questions for the reviewer |
-| 21 | Glossary |
-| 22 | Council review outcome: what was simplified, what was kept, and why |
-| 23 | Engineering standards, API versioning policy, documentation and hand-over readiness |
+| 9.7      | Exception handling contract                                                           |
+| 3        | Where the codebase is today and what we keep                                          |
+| 4        | The target architecture, layer by layer, with the request path                        |
+| 5        | The technology stack and why each piece was chosen                                    |
+| 6        | Decisions we made, including what we deliberately rejected                            |
+| 7        | Repository layout                                                                     |
+| 8        | Data model: every table, key columns, indexes, constraints                            |
+| 9        | API design contract                                                                   |
+| 10       | Authentication, authorisation, roles and permissions                                  |
+| 11       | Security controls, layer by layer                                                     |
+| 12       | Data retrieval, search, caching and database performance strategy                     |
+| 13       | Background jobs and asynchronous work                                                 |
+| 14       | Observability: logs, metrics, alerts                                                  |
+| 15       | Infrastructure, containers, environments, backups                                     |
+| 16       | CI/CD and Git workflow                                                                |
+| 17       | Testing strategy                                                                      |
+| 18       | Delivery phases with features, deliverables and exit criteria                         |
+| 19       | Scale thresholds: when to turn on the things we left off                              |
+| 20       | Risks and open questions for the reviewer                                             |
+| 21       | Glossary                                                                              |
+| 22       | Council review outcome: what was simplified, what was kept, and why                   |
+| 23       | Engineering standards, API versioning policy, documentation and hand-over readiness   |
 
 ---
 
@@ -51,15 +51,15 @@ Success looks like: a volunteer registers a patient with photos on their phone a
 
 ## 2. Constraints that shape every decision
 
-| Constraint | Consequence |
-| --- | --- |
-| Non-profit, minimal recurring budget | One small VPS to start. No managed services with per-seat or per-request pricing. Every component must run on that box. |
-| Everything open source | All software is OSI-licensed and self-hostable. Third parties are limited to things that *cannot* be self-hosted: the payment gateway, the SMTP relay, DNS. |
-| One developer, part-time | Modular monolith, one deployable, boring tools with long support lives. No Kubernetes, no service mesh, no bespoke infra. |
-| Patient health data and donor money | Server-side enforcement of every permission, append-only audit log, encrypted backups, no PHI in logs, MFA for privileged roles. |
+| Constraint                                                       | Consequence                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Non-profit, minimal recurring budget                             | One small VPS to start. No managed services with per-seat or per-request pricing. Every component must run on that box.                                                                                                               |
+| Everything open source                                           | All software is OSI-licensed and self-hostable. Third parties are limited to things that _cannot_ be self-hosted: the payment gateway, the SMTP relay, DNS.                                                                           |
+| One developer, part-time                                         | Modular monolith, one deployable, boring tools with long support lives. No Kubernetes, no service mesh, no bespoke infra.                                                                                                             |
+| Patient health data and donor money                              | Server-side enforcement of every permission, append-only audit log, encrypted backups, no PHI in logs, MFA for privileged roles.                                                                                                      |
 | Field use on volunteers' own phones and tablets over mobile data | Mobile-first responsive web app (360 px phones are the primary design target, tablets and laptops second), autosaved drafts, idempotent submissions that survive retries. Offline mode is out of scope: camps have mobile data (§20). |
-| No technical staff at the organisation | Everything an admin does is a form in the browser. No trustees, no on-call rota; the developer is the operator for now, and the plan records that as an accepted risk (D24). |
-| Must evolve without a rewrite | Clear module boundaries and the scale thresholds in §19 define *when* to add Redis, read replicas, a separate worker host, etc. |
+| No technical staff at the organisation                           | Everything an admin does is a form in the browser. No trustees, no on-call rota; the developer is the operator for now, and the plan records that as an accepted risk (D24).                                                          |
+| Must evolve without a rewrite                                    | Clear module boundaries and the scale thresholds in §19 define _when_ to add Redis, read replicas, a separate worker host, etc.                                                                                                       |
 
 ---
 
@@ -166,26 +166,26 @@ Summarised from `ARCHITECTURE_AUDIT.md`:
 
 Each module under `src/server/modules/<name>/` owns its tables, its service functions, its zod schemas, and its DTO mappers. Modules call each other only through exported service functions, never by touching another module's tables. This is the "modular monolith" rule and it is enforced by an ESLint import boundary rule (`no-restricted-imports` per module) so it cannot erode silently.
 
-| Module | Owns | Depends on |
-| --- | --- | --- |
-| `auth` | sessions, password hashing, MFA, login throttling | `users`, `audit` |
-| `users` | users, roles, permissions, role assignments | `audit` |
-| `cms` | pages, sections, section versions, publish flow, site settings | `media`, `audit` |
-| `media` | media assets, upload signing, variants | `jobs` |
-| `enquiries` | contact submissions, status, assignment, replies | `notifications`, `audit` |
-| `patients` | patient master, deduplication, patient codes | `audit` |
-| `camps` | camps, staffing, camp-day operations | `users`, `audit` |
-| `clinics` | clinics, clinic intake | `audit` |
-| `encounters` | encounters (camp/clinic), medical and dental histories, vitals, oral screenings, screening images and results, dentist reviews, diagnoses, treatments, prescriptions, outcomes, follow-ups, all stage machines | `patients`, `camps`, `clinics`, `media`, `communications`, `audit` |
-| `referrals` | referrals, their lifecycle, clinic continuity link | `patients`, `camps`, `clinics`, `encounters`, `communications`, `audit` |
-| `communications` | log of phone calls and in-person notices to patients; channel adapters (SMS/WhatsApp) are parked and not built | `patients`, `audit` |
-| `programmes` | oral cancer surveillance (lesion assessments, biopsy referrals, surveillance schedule) and tobacco cessation (enrolments, counselling sessions, quit status) | `patients`, `encounters`, `referrals`, `communications`, `audit` |
-| `ai_screening` | calls the inference service for a completed image set, stores `screening_results` rows with model name and version, tracks model registry and evaluation metrics | `encounters`, `media`, `jobs`, `audit` |
-| `donations` | campaigns, donors, donations, payment orders, gateway events, receipts, reconciliation | `notifications`, `jobs`, `audit` |
-| `reports` | read-only aggregations and exports | read access to all, no writes |
-| `audit` | append-only audit log | — |
-| `notifications` | email templates, sending, delivery log | `jobs` |
-| `jobs` | pg-boss wrapper, job definitions, schedules | — |
+| Module           | Owns                                                                                                                                                                                                           | Depends on                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `auth`           | sessions, password hashing, MFA, login throttling                                                                                                                                                              | `users`, `audit`                                                        |
+| `users`          | users, roles, permissions, role assignments                                                                                                                                                                    | `audit`                                                                 |
+| `cms`            | pages, sections, section versions, publish flow, site settings                                                                                                                                                 | `media`, `audit`                                                        |
+| `media`          | media assets, upload signing, variants                                                                                                                                                                         | `jobs`                                                                  |
+| `enquiries`      | contact submissions, status, assignment, replies                                                                                                                                                               | `notifications`, `audit`                                                |
+| `patients`       | patient master, deduplication, patient codes                                                                                                                                                                   | `audit`                                                                 |
+| `camps`          | camps, staffing, camp-day operations                                                                                                                                                                           | `users`, `audit`                                                        |
+| `clinics`        | clinics, clinic intake                                                                                                                                                                                         | `audit`                                                                 |
+| `encounters`     | encounters (camp/clinic), medical and dental histories, vitals, oral screenings, screening images and results, dentist reviews, diagnoses, treatments, prescriptions, outcomes, follow-ups, all stage machines | `patients`, `camps`, `clinics`, `media`, `communications`, `audit`      |
+| `referrals`      | referrals, their lifecycle, clinic continuity link                                                                                                                                                             | `patients`, `camps`, `clinics`, `encounters`, `communications`, `audit` |
+| `communications` | log of phone calls and in-person notices to patients; channel adapters (SMS/WhatsApp) are parked and not built                                                                                                 | `patients`, `audit`                                                     |
+| `programmes`     | oral cancer surveillance (lesion assessments, biopsy referrals, surveillance schedule) and tobacco cessation (enrolments, counselling sessions, quit status)                                                   | `patients`, `encounters`, `referrals`, `communications`, `audit`        |
+| `ai_screening`   | calls the inference service for a completed image set, stores `screening_results` rows with model name and version, tracks model registry and evaluation metrics                                               | `encounters`, `media`, `jobs`, `audit`                                  |
+| `donations`      | campaigns, donors, donations, payment orders, gateway events, receipts, reconciliation                                                                                                                         | `notifications`, `jobs`, `audit`                                        |
+| `reports`        | read-only aggregations and exports                                                                                                                                                                             | read access to all, no writes                                           |
+| `audit`          | append-only audit log                                                                                                                                                                                          | —                                                                       |
+| `notifications`  | email templates, sending, delivery log                                                                                                                                                                         | `jobs`                                                                  |
+| `jobs`           | pg-boss wrapper, job definitions, schedules                                                                                                                                                                    | —                                                                       |
 
 ---
 
@@ -193,32 +193,32 @@ Each module under `src/server/modules/<name>/` owns its tables, its service func
 
 All licences are permissive open source unless marked. "Why" is the deciding reason, not a feature list.
 
-| Layer | Choice | Version target | Why this and not the alternative |
-| --- | --- | --- | --- |
-| Runtime | Node.js | 24 LTS | Current LTS (since October 2025) and what the developer's machine runs; matches Next.js requirements. |
-| Framework | Next.js (App Router) | latest stable at scaffold (16.x) | One process for public site, admin app and API. Server rendering fixes the SPA's SEO gap. MIT, self-hostable via `output: 'standalone'`. |
-| Language | TypeScript, `strict: true` | 5.x | The current repo has strictness off; we turn it on from day one. |
-| UI | React 19, Tailwind, shadcn/ui, lucide | — | Already in the repo; reuse the design system. |
-| Forms/validation | react-hook-form + zod | — | Same zod schema validates on client and server; the server one is authoritative. |
-| Data access | Drizzle ORM + `pg` | — | SQL-shaped, typed, tiny runtime, migrations are plain SQL files we can read in review. Chosen over Prisma to avoid a query engine binary and to keep `EXPLAIN`-able SQL visible. |
-| Database | PostgreSQL | 16 | Relational integrity for HMIS and finance, JSONB for CMS, full-text and trigram search, `SKIP LOCKED` queues. One engine for everything. |
-| Queue | pg-boss | — | Durable, transactional job queue on top of Postgres. No extra broker to run. See D8 for why not Kafka/BullMQ. |
-| File storage | Local encrypted volume behind a `StorageAdapter` interface (`local` now, `s3` later) | — | Tens of GB of images on one box do not need an object-storage service. The adapter keeps the switch to MinIO or any S3 bucket a config change at the §19 threshold. Council consensus (§22). |
-| Image processing | sharp | — | Re-encode, resize and strip EXIF inline on upload (in-process job). |
-| AI inference | Separate `ai-inference` container: Python 3.12, FastAPI, ONNX Runtime on CPU; internal versioned HTTP API `POST /v1/analyse`; model files mounted read-only with a `model_manifest.json` (name, version, training-set hash, validation metrics) | Phase 5 | Keeps Python and model weights out of the Node process and lets the model be swapped or retrained without touching the application. CPU inference is seconds per image, acceptable because results are asynchronous and assistive (D25). |
-| Auth | Better Auth (MIT) with its two-factor (TOTP + backup codes) plugin, Drizzle adapter, database sessions; RBAC is ours | — | Two of three council reviewers, and the plan's own risk profile, argue against hand-rolled session and MFA plumbing built by one developer with no security review budget. The library handles sessions, password reset, invites and TOTP; permissions and row scope stay custom (§10). Verify plugin coverage at Phase 1 start (§22). |
-| Email | Nodemailer over SMTP, initially a normal Gmail account with an app password (about 500 messages/day, to be confirmed by the organisation) | — | The organisation has no business mail account. Volumes in v1 are invites, resets and enquiry notices, well under the limit; a relay can be swapped in by env change. Templates in React Email. |
-| Reverse proxy | Nginx; TLS from a Cloudflare Origin CA certificate when the proxy is on (15-year, no renewal moving part), certbot otherwise | — | You asked for Nginx; it is the perimeter in §4. Caddy is an acceptable swap (auto-TLS) if preferred. |
-| Containers | Docker + Docker Compose | Compose v2 | One `compose.yaml` runs dev, staging and prod with profiles. |
-| Logs | pino JSON to stdout → Docker `json-file` driver with rotation; queried with `docker logs` + `jq` | — | One box, one developer: a log aggregation stack (Loki) costs RAM and time and answers questions nobody is asking yet. Deferred to the §19 threshold. |
-| Health checks and alerts | `infra/checks/check.sh` run by cron every 5 min: readiness, disk, backup age, failed jobs, 5xx count, cert expiry, login-failure bursts → Slack webhook / email | — | Covers every alert in §14.4 with a 200-line script and zero resident memory. Prometheus + Grafana come in as an optional profile when there is a slowdown nobody can explain (§19). |
-| Uptime | A free hosted uptime monitor (for example UptimeRobot's free tier) checking `/api/health/ready` and receiving the check.sh heartbeat | — | A monitor on the VPS cannot report the VPS going down and there is no second host. Like Cloudflare, this is a free, non-open-source exception accepted because the alternative is no external monitoring at all. |
-| Error tracking | none in v1 (logs + request ids) | — | GlitchTip cut by council consensus; reconsider above ~10 distinct errors/day. |
-| Backups | `pg_dump` every 6 h + media directory → restic (encrypted) repository on a separate volume of the VPS, mirrored to the developer's machine whenever it is online; pgBackRest WAL archiving when the database exceeds 5 GB | — | There is no backup host yet. The on-VPS repository covers application and database corruption; the developer-machine mirror covers loss of the VPS. Restore is tested monthly on the VPS in a throwaway container. Accepted risk recorded in D24. |
-| CI/CD | GitHub Actions → GHCR image → SSH deploy; trunk-based | — | Free for this repo size; no deploy platform lock-in. |
-| Testing | Vitest (unit + integration against a GitHub Actions Postgres service), Playwright smoke on push and full nightly | — | Same coverage as Testcontainers with less library surface; k6 and OpenAPI generation cut (§22). |
-| Payments | Razorpay (default; final choice in Phase 7 after fee comparison, parked until the organisation asks) | — | Indian UPI/cards/netbanking, webhooks with HMAC signatures. Not open source; unavoidable. |
-| Edge (optional) | Cloudflare free tier | — | Not open source, but free and removable. Provides CDN/DDoS/WAF we could not otherwise afford. Reviewer decision (§20). |
+| Layer                    | Choice                                                                                                                                                                                                                                          | Version target                   | Why this and not the alternative                                                                                                                                                                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime                  | Node.js                                                                                                                                                                                                                                         | 24 LTS                           | Current LTS (since October 2025) and what the developer's machine runs; matches Next.js requirements.                                                                                                                                                                                                                                  |
+| Framework                | Next.js (App Router)                                                                                                                                                                                                                            | latest stable at scaffold (16.x) | One process for public site, admin app and API. Server rendering fixes the SPA's SEO gap. MIT, self-hostable via `output: 'standalone'`.                                                                                                                                                                                               |
+| Language                 | TypeScript, `strict: true`                                                                                                                                                                                                                      | 5.x                              | The current repo has strictness off; we turn it on from day one.                                                                                                                                                                                                                                                                       |
+| UI                       | React 19, Tailwind, shadcn/ui, lucide                                                                                                                                                                                                           | —                                | Already in the repo; reuse the design system.                                                                                                                                                                                                                                                                                          |
+| Forms/validation         | react-hook-form + zod                                                                                                                                                                                                                           | —                                | Same zod schema validates on client and server; the server one is authoritative.                                                                                                                                                                                                                                                       |
+| Data access              | Drizzle ORM + `pg`                                                                                                                                                                                                                              | —                                | SQL-shaped, typed, tiny runtime, migrations are plain SQL files we can read in review. Chosen over Prisma to avoid a query engine binary and to keep `EXPLAIN`-able SQL visible.                                                                                                                                                       |
+| Database                 | PostgreSQL                                                                                                                                                                                                                                      | 16                               | Relational integrity for HMIS and finance, JSONB for CMS, full-text and trigram search, `SKIP LOCKED` queues. One engine for everything.                                                                                                                                                                                               |
+| Queue                    | pg-boss                                                                                                                                                                                                                                         | —                                | Durable, transactional job queue on top of Postgres. No extra broker to run. See D8 for why not Kafka/BullMQ.                                                                                                                                                                                                                          |
+| File storage             | Local encrypted volume behind a `StorageAdapter` interface (`local` now, `s3` later)                                                                                                                                                            | —                                | Tens of GB of images on one box do not need an object-storage service. The adapter keeps the switch to MinIO or any S3 bucket a config change at the §19 threshold. Council consensus (§22).                                                                                                                                           |
+| Image processing         | sharp                                                                                                                                                                                                                                           | —                                | Re-encode, resize and strip EXIF inline on upload (in-process job).                                                                                                                                                                                                                                                                    |
+| AI inference             | Separate `ai-inference` container: Python 3.12, FastAPI, ONNX Runtime on CPU; internal versioned HTTP API `POST /v1/analyse`; model files mounted read-only with a `model_manifest.json` (name, version, training-set hash, validation metrics) | Phase 5                          | Keeps Python and model weights out of the Node process and lets the model be swapped or retrained without touching the application. CPU inference is seconds per image, acceptable because results are asynchronous and assistive (D25).                                                                                               |
+| Auth                     | Better Auth (MIT) with its two-factor (TOTP + backup codes) plugin, Drizzle adapter, database sessions; RBAC is ours                                                                                                                            | —                                | Two of three council reviewers, and the plan's own risk profile, argue against hand-rolled session and MFA plumbing built by one developer with no security review budget. The library handles sessions, password reset, invites and TOTP; permissions and row scope stay custom (§10). Verify plugin coverage at Phase 1 start (§22). |
+| Email                    | Nodemailer over SMTP, initially a normal Gmail account with an app password (about 500 messages/day, to be confirmed by the organisation)                                                                                                       | —                                | The organisation has no business mail account. Volumes in v1 are invites, resets and enquiry notices, well under the limit; a relay can be swapped in by env change. Templates in React Email.                                                                                                                                         |
+| Reverse proxy            | Nginx; TLS from a Cloudflare Origin CA certificate when the proxy is on (15-year, no renewal moving part), certbot otherwise                                                                                                                    | —                                | You asked for Nginx; it is the perimeter in §4. Caddy is an acceptable swap (auto-TLS) if preferred.                                                                                                                                                                                                                                   |
+| Containers               | Docker + Docker Compose                                                                                                                                                                                                                         | Compose v2                       | One `compose.yaml` runs dev, staging and prod with profiles.                                                                                                                                                                                                                                                                           |
+| Logs                     | pino JSON to stdout → Docker `json-file` driver with rotation; queried with `docker logs` + `jq`                                                                                                                                                | —                                | One box, one developer: a log aggregation stack (Loki) costs RAM and time and answers questions nobody is asking yet. Deferred to the §19 threshold.                                                                                                                                                                                   |
+| Health checks and alerts | `infra/checks/check.sh` run by cron every 5 min: readiness, disk, backup age, failed jobs, 5xx count, cert expiry, login-failure bursts → Slack webhook / email                                                                                 | —                                | Covers every alert in §14.4 with a 200-line script and zero resident memory. Prometheus + Grafana come in as an optional profile when there is a slowdown nobody can explain (§19).                                                                                                                                                    |
+| Uptime                   | A free hosted uptime monitor (for example UptimeRobot's free tier) checking `/api/health/ready` and receiving the check.sh heartbeat                                                                                                            | —                                | A monitor on the VPS cannot report the VPS going down and there is no second host. Like Cloudflare, this is a free, non-open-source exception accepted because the alternative is no external monitoring at all.                                                                                                                       |
+| Error tracking           | none in v1 (logs + request ids)                                                                                                                                                                                                                 | —                                | GlitchTip cut by council consensus; reconsider above ~10 distinct errors/day.                                                                                                                                                                                                                                                          |
+| Backups                  | `pg_dump` every 6 h + media directory → restic (encrypted) repository on a separate volume of the VPS, mirrored to the developer's machine whenever it is online; pgBackRest WAL archiving when the database exceeds 5 GB                       | —                                | There is no backup host yet. The on-VPS repository covers application and database corruption; the developer-machine mirror covers loss of the VPS. Restore is tested monthly on the VPS in a throwaway container. Accepted risk recorded in D24.                                                                                      |
+| CI/CD                    | GitHub Actions → GHCR image → SSH deploy; trunk-based                                                                                                                                                                                           | —                                | Free for this repo size; no deploy platform lock-in.                                                                                                                                                                                                                                                                                   |
+| Testing                  | Vitest (unit + integration against a GitHub Actions Postgres service), Playwright smoke on push and full nightly                                                                                                                                | —                                | Same coverage as Testcontainers with less library surface; k6 and OpenAPI generation cut (§22).                                                                                                                                                                                                                                        |
+| Payments                 | Razorpay (default; final choice in Phase 7 after fee comparison, parked until the organisation asks)                                                                                                                                            | —                                | Indian UPI/cards/netbanking, webhooks with HMAC signatures. Not open source; unavoidable.                                                                                                                                                                                                                                              |
+| Edge (optional)          | Cloudflare free tier                                                                                                                                                                                                                            | —                                | Not open source, but free and removable. Provides CDN/DDoS/WAF we could not otherwise afford. Reviewer decision (§20).                                                                                                                                                                                                                 |
 
 ---
 
@@ -226,7 +226,7 @@ All licences are permissive open source unless marked. "Why" is the deciding rea
 
 Each decision: context → decision → consequence. Rejected options are named so the question is not reopened by accident.
 
-**D1. Content is JSON *inside* Postgres, not a JSON file.**
+**D1. Content is JSON _inside_ Postgres, not a JSON file.**
 Content sections are document-shaped and edited whole through forms; relational tables per field would be brittle. A file on disk cannot do draft/publish, versions, concurrent edits, or survive a read-only container. Decision: `cms_sections.data JSONB`, validated by a zod schema per section type on write, versioned in `cms_section_versions`. Rejected: JSON files in the repo (needs redeploy), JSON files on a volume (no history, no locking), a headless CMS product (another system to run and secure).
 
 **D2. Next.js full-stack in one process; no separate Express API.**
@@ -263,7 +263,7 @@ Single instance means the Next.js filesystem cache and in-process rate-limit cou
 Roles are bundles of permissions stored in the database; code checks permissions (`patients:read`) never roles (`if role === 'dentist'`). Adding a role is a data change. The current codebase's scattered `session.role === ...` checks are the anti-pattern we are removing.
 
 **D13. Financial and clinical records are never hard-deleted through the app.**
-Confirmed donations, payment events, audit rows and encounters are insert-only from the application's database role (no `DELETE` grant). Corrections are new rows that reference the original. Patients can be *merged* (dedup) and *archived*, not deleted.
+Confirmed donations, payment events, audit rows and encounters are insert-only from the application's database role (no `DELETE` grant). Corrections are new rows that reference the original. Patients can be _merged_ (dedup) and _archived_, not deleted.
 
 **D14. Environments are identical containers with different env files.**
 Dev, staging and prod run the same `compose.yaml` and the same image tag flow. No "works on my machine": the dev database is Postgres in Docker, not SQLite.
@@ -368,6 +368,7 @@ saathi_cares/
 ```
 
 Rules enforced by lint:
+
 - `app/**` may import from `src/components`, `src/lib`, and `src/server/**/service.ts` + `dto.ts` only.
 - `src/server/modules/<a>` may not import `src/server/modules/<b>/schema.ts`; only `service.ts`.
 - `src/server/**` may not import from `app/**` or anything with `'use client'`.
@@ -683,7 +684,7 @@ draft ──volunteer submits──▶ submitted ──dentist opens──▶ un
         volunteer re-captures / completes, resubmits → submitted
 ```
 
-Roles: `volunteer` moves draft→submitted and needs_info→submitted; `dentist` moves submitted→under_dentist_review→reviewed and →needs_info; `reviewed→closed` is automatic when the decision needs nothing further, or when the referral/treatment is recorded. There is no separate supervisor queue: the dentist review *is* the review step. `ops_admin` can reassign or close with a reason.
+Roles: `volunteer` moves draft→submitted and needs_info→submitted; `dentist` moves submitted→under_dentist_review→reviewed and →needs_info; `reviewed→closed` is automatic when the decision needs nothing further, or when the referral/treatment is recorded. There is no separate supervisor queue: the dentist review _is_ the review step. `ops_admin` can reassign or close with a reason.
 
 Clinic encounter:
 
@@ -786,16 +787,16 @@ Extensions: `pgcrypto`, `citext`, `pg_trgm`, `pg_stat_statements`.
 
 ### 8.9 Patient data privacy model
 
-Authentication and authorisation say *who* may act. This section says *what* the data is, *how* it is handled at rest, in transit, in logs, in audit, in reports and at end of life. It is enforced by code and tests, not by policy documents alone.
+Authentication and authorisation say _who_ may act. This section says _what_ the data is, _how_ it is handled at rest, in transit, in logs, in audit, in reports and at end of life. It is enforced by code and tests, not by policy documents alone.
 
 **Classification.** Every column and bucket is assigned a tier in the Drizzle schema (a `tier` annotation read by the audit and logging helpers).
 
-| Tier | Data | Examples | Handling summary |
-| --- | --- | --- | --- |
-| T0 public | Published website content | CMS sections, campaigns | Cached, indexed, exportable |
-| T1 internal | Operational, non-personal | camps, clinics, users' names and roles, jobs, CMS drafts | Audit stores full before/after |
-| T2 personal identifiers | Anything that identifies a patient or donor | name, phone, address, guardian, dob, identifiers, communication content, donor email/PAN | Masked in lists, redacted in logs, audit stores field names only, encrypted where lookup allows |
-| T3 sensitive health | Clinical facts about a person | histories, vitals, screening checklists, images, results, reviews, diagnoses, treatments, prescriptions, outcomes, consents | T2 handling plus purpose-logged reads, private storage with short signed URLs, no edge caching, export controls |
+| Tier                    | Data                                        | Examples                                                                                                                    | Handling summary                                                                                                |
+| ----------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| T0 public               | Published website content                   | CMS sections, campaigns                                                                                                     | Cached, indexed, exportable                                                                                     |
+| T1 internal             | Operational, non-personal                   | camps, clinics, users' names and roles, jobs, CMS drafts                                                                    | Audit stores full before/after                                                                                  |
+| T2 personal identifiers | Anything that identifies a patient or donor | name, phone, address, guardian, dob, identifiers, communication content, donor email/PAN                                    | Masked in lists, redacted in logs, audit stores field names only, encrypted where lookup allows                 |
+| T3 sensitive health     | Clinical facts about a person               | histories, vitals, screening checklists, images, results, reviews, diagnoses, treatments, prescriptions, outcomes, consents | T2 handling plus purpose-logged reads, private storage with short signed URLs, no edge caching, export controls |
 
 **Rules.**
 
@@ -823,17 +824,17 @@ Authentication and authorisation say *who* may act. This section says *what* the
 
 ### 9.2 Endpoint inventory (by phase)
 
-| Phase | Endpoints |
-| --- | --- |
-| 1 | `POST /auth/login`, `POST /auth/mfa/verify`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password/change`; `GET/POST /users`, `GET/PATCH /users/:id`, `POST /users/:id/disable`, `POST /users/:id/reset-mfa`; `GET /roles`, `GET /permissions`; `GET /audit` |
-| 4 | `GET /cms/pages`, `GET/PATCH /cms/pages/:slug`, `GET/POST /cms/pages/:slug/sections`, `PATCH /cms/sections/:id`, `POST /cms/sections/:id/publish`, `POST /cms/sections/:id/rollback/:version`, `GET /cms/sections/:id/versions`; `POST /media/uploads` (presign), `POST /media/uploads/:id/complete`, `GET /media`, `DELETE /media/:id`; `GET/PATCH /settings`; `POST /enquiries` (public, rate-limited, honeypot + Turnstile/hCaptcha optional), `GET /enquiries`, `GET/PATCH /enquiries/:id`, `POST /enquiries/:id/replies` |
-| 2a | `GET /patients?q=&district=&cursor=`, `POST /patients` (dedup check), `GET/PATCH /patients/:id`, `POST /patients/:id/merge`, `GET /patients/:id/timeline`, `GET/POST /patients/:id/consents`, `POST /consents/:id/revoke`; `GET/POST /camps`, `GET/PATCH /camps/:id`, `POST /camps/:id/staff`, `GET /camps/:id/summary`; `GET/POST /clinics`, `PATCH /clinics/:id`; `POST /encounters` (idempotency key; demographics, medical and dental history, vitals in one submission), `GET/PATCH /encounters/:id`, `POST /encounters/:id/transitions`; `PUT /encounters/:id/screening` (checklist), `POST /encounters/:id/screening/images` (presign per view), `POST /screening-images/:id/complete`, `POST /screening-images/:id/retake`, `GET /encounters/:id/screening` (checklist, images with signed URLs, results); `GET /patients/duplicates`, `POST /patients/duplicates/:id/resolve` |
-| 2b | `GET /reviews/queue?camp=&urgency=` (dentist), `POST /encounters/:id/reviews` (start), `PATCH /reviews/:id` (findings, diagnosis, risk), `POST /reviews/:id/complete` (decision), `POST /reviews/:id/needs-info`; `POST /encounters/:id/diagnoses`, `POST /encounters/:id/treatments`, `POST /encounters/:id/prescriptions`, `POST /prescriptions/:id/deliver`, `GET /prescriptions/:id/print` |
-| 3 | `POST /referrals` (from a completed review), `GET /referrals?clinic=&status=`, `POST /referrals/:id/inform|accept|schedule|arrive|complete|cancel`, `POST /referrals/:id/start-clinic-encounter`; `GET /clinics/:id/schedule?date=`; `POST /encounters/:id/outcome`; `GET/POST /follow-ups`, `PATCH /follow-ups/:id`, `POST /follow-ups/:id/complete`; `GET/POST /patients/:id/communications`, `POST /communications/:id/log-result`; `POST /exports/patients` (permissioned, async) |
-| 3 (programmes) | `POST /reviews/:id/lesion-assessments`, `GET /lesion-assessments?status=`, `PATCH /lesion-assessments/:id`, `POST /lesion-assessments/:id/biopsy-result`; `POST /patients/:id/enrolments`, `GET /enrolments?programme=&status=&counsellor=`, `PATCH /enrolments/:id`, `POST /enrolments/:id/status`; `GET /cessation-sessions/worklist`, `POST /enrolments/:id/sessions`, `PATCH /cessation-sessions/:id`, `POST /cessation-sessions/:id/hold` |
-| 5 (AI) | `GET /ai/models`, `POST /ai/models` (register candidate from manifest), `POST /ai/models/:id/validate` (dentist sign-off), `POST /ai/models/:id/deploy|retire`; `POST /screenings/:id/ai-analyse` (manual trigger), `GET /screenings/:id/ai-result`; internal: `POST ai-inference:/v1/analyse` |
-| 7 | `GET /campaigns` (public), `POST /donations/orders` (public), `POST /webhooks/razorpay`, `GET /donations`, `GET /donations/:id`, `POST /donations/:id/receipt/resend`, `GET /donations/reconciliation`, `GET/POST/PATCH /campaigns` |
-| 3, 7 | `GET /reports/overview`, `GET /reports/camps`, `GET /reports/referrals`, `GET /reports/programmes` (Phase 3); `GET /reports/donations`, `POST /donations/statutory-exports` (Phase 7); `POST /reports/exports` (async job → private media asset, downloaded from the admin) |
+| Phase          | Endpoints                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1              | `POST /auth/login`, `POST /auth/mfa/verify`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password/change`; `GET/POST /users`, `GET/PATCH /users/:id`, `POST /users/:id/disable`, `POST /users/:id/reset-mfa`; `GET /roles`, `GET /permissions`; `GET /audit`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 4              | `GET /cms/pages`, `GET/PATCH /cms/pages/:slug`, `GET/POST /cms/pages/:slug/sections`, `PATCH /cms/sections/:id`, `POST /cms/sections/:id/publish`, `POST /cms/sections/:id/rollback/:version`, `GET /cms/sections/:id/versions`; `POST /media/uploads` (presign), `POST /media/uploads/:id/complete`, `GET /media`, `DELETE /media/:id`; `GET/PATCH /settings`; `POST /enquiries` (public, rate-limited, honeypot + Turnstile/hCaptcha optional), `GET /enquiries`, `GET/PATCH /enquiries/:id`, `POST /enquiries/:id/replies`                                                                                                                                                                                                                                                                                                                                                          |
+| 2a             | `GET /patients?q=&district=&cursor=`, `POST /patients` (dedup check), `GET/PATCH /patients/:id`, `POST /patients/:id/merge`, `GET /patients/:id/timeline`, `GET/POST /patients/:id/consents`, `POST /consents/:id/revoke`; `GET/POST /camps`, `GET/PATCH /camps/:id`, `POST /camps/:id/staff`, `GET /camps/:id/summary`; `GET/POST /clinics`, `PATCH /clinics/:id`; `POST /encounters` (idempotency key; demographics, medical and dental history, vitals in one submission), `GET/PATCH /encounters/:id`, `POST /encounters/:id/transitions`; `PUT /encounters/:id/screening` (checklist), `POST /encounters/:id/screening/images` (presign per view), `POST /screening-images/:id/complete`, `POST /screening-images/:id/retake`, `GET /encounters/:id/screening` (checklist, images with signed URLs, results); `GET /patients/duplicates`, `POST /patients/duplicates/:id/resolve` |
+| 2b             | `GET /reviews/queue?camp=&urgency=` (dentist), `POST /encounters/:id/reviews` (start), `PATCH /reviews/:id` (findings, diagnosis, risk), `POST /reviews/:id/complete` (decision), `POST /reviews/:id/needs-info`; `POST /encounters/:id/diagnoses`, `POST /encounters/:id/treatments`, `POST /encounters/:id/prescriptions`, `POST /prescriptions/:id/deliver`, `GET /prescriptions/:id/print`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 3              | `POST /referrals` (from a completed review), `GET /referrals?clinic=&status=`, `POST /referrals/:id/inform                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | accept                                                                                                                                | schedule | arrive | complete | cancel`, `POST /referrals/:id/start-clinic-encounter`; `GET /clinics/:id/schedule?date=`; `POST /encounters/:id/outcome`; `GET/POST /follow-ups`, `PATCH /follow-ups/:id`, `POST /follow-ups/:id/complete`; `GET/POST /patients/:id/communications`, `POST /communications/:id/log-result`; `POST /exports/patients` (permissioned, async) |
+| 3 (programmes) | `POST /reviews/:id/lesion-assessments`, `GET /lesion-assessments?status=`, `PATCH /lesion-assessments/:id`, `POST /lesion-assessments/:id/biopsy-result`; `POST /patients/:id/enrolments`, `GET /enrolments?programme=&status=&counsellor=`, `PATCH /enrolments/:id`, `POST /enrolments/:id/status`; `GET /cessation-sessions/worklist`, `POST /enrolments/:id/sessions`, `PATCH /cessation-sessions/:id`, `POST /cessation-sessions/:id/hold`                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 5 (AI)         | `GET /ai/models`, `POST /ai/models` (register candidate from manifest), `POST /ai/models/:id/validate` (dentist sign-off), `POST /ai/models/:id/deploy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | retire`; `POST /screenings/:id/ai-analyse`(manual trigger),`GET /screenings/:id/ai-result`; internal: `POST ai-inference:/v1/analyse` |
+| 7              | `GET /campaigns` (public), `POST /donations/orders` (public), `POST /webhooks/razorpay`, `GET /donations`, `GET /donations/:id`, `POST /donations/:id/receipt/resend`, `GET /donations/reconciliation`, `GET/POST/PATCH /campaigns`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 3, 7           | `GET /reports/overview`, `GET /reports/camps`, `GET /reports/referrals`, `GET /reports/programmes` (Phase 3); `GET /reports/donations`, `POST /donations/statutory-exports` (Phase 7); `POST /reports/exports` (async job → private media asset, downloaded from the admin)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ### 9.3 Lists, filtering, pagination
 
@@ -849,7 +850,7 @@ Authentication and authorisation say *who* may act. This section says *what* the
 // error                { "error": { "code": "VALIDATION_FAILED", "message": "…", "details": [{ "path": "phone", "message": "…" }], "request_id": "…" } }
 ```
 
-Status codes: 200/201/204; 400 validation; 401 no session; 403 no permission (never 404 to hide existence *within* the admin app; public endpoints do 404); 409 conflict/idempotency mismatch; 422 invalid state transition; 429 throttled; 500 with request id and no stack.
+Status codes: 200/201/204; 400 validation; 401 no session; 403 no permission (never 404 to hide existence _within_ the admin app; public endpoints do 404); 409 conflict/idempotency mismatch; 422 invalid state transition; 429 throttled; 500 with request id and no stack.
 
 ### 9.5 Idempotency
 
@@ -865,27 +866,27 @@ Principles: fail loudly, fail atomically, fail with context, never swallow. An e
 
 **Taxonomy** (`src/server/http/errors.ts`). One base class `AppError { code, httpStatus, message (safe for users), details?, retryable, cause? }` and a closed set of subclasses:
 
-| Class | HTTP | Raised when | Client behaviour |
-| --- | --- | --- | --- |
-| `ValidationError` | 400 | zod parse fails, business rule on input | field-level messages on the form |
-| `AuthenticationError`, `MfaRequiredError` | 401 | no/expired session, MFA not verified | redirect to login / MFA step, preserve draft |
-| `ForbiddenError` | 403 | permission or row scope fails | toast; never reveals whether the row exists |
-| `NotFoundError` | 404 | entity missing (public routes) | not-found page |
-| `ConflictError` | 409 | idempotency key reused with different body; optimistic-lock version mismatch; unique violation | merge dialog showing the other user's version, or "already submitted" |
-| `InvalidTransitionError` | 422 | stage machine rejects `from → to` for this role | explain the current stage and allowed actions |
-| `RateLimitedError` | 429 | throttle hit | wait with `Retry-After` |
-| `ExternalServiceError` | 502/503 | gateway, SMTP, file storage, SMS provider timeout or failure; `retryable` set per case | retry with same `Idempotency-Key`; draft kept |
-| `InternalError` | 500 | anything else | generic message with request id |
+| Class                                     | HTTP    | Raised when                                                                                    | Client behaviour                                                      |
+| ----------------------------------------- | ------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `ValidationError`                         | 400     | zod parse fails, business rule on input                                                        | field-level messages on the form                                      |
+| `AuthenticationError`, `MfaRequiredError` | 401     | no/expired session, MFA not verified                                                           | redirect to login / MFA step, preserve draft                          |
+| `ForbiddenError`                          | 403     | permission or row scope fails                                                                  | toast; never reveals whether the row exists                           |
+| `NotFoundError`                           | 404     | entity missing (public routes)                                                                 | not-found page                                                        |
+| `ConflictError`                           | 409     | idempotency key reused with different body; optimistic-lock version mismatch; unique violation | merge dialog showing the other user's version, or "already submitted" |
+| `InvalidTransitionError`                  | 422     | stage machine rejects `from → to` for this role                                                | explain the current stage and allowed actions                         |
+| `RateLimitedError`                        | 429     | throttle hit                                                                                   | wait with `Retry-After`                                               |
+| `ExternalServiceError`                    | 502/503 | gateway, SMTP, file storage, SMS provider timeout or failure; `retryable` set per case         | retry with same `Idempotency-Key`; draft kept                         |
+| `InternalError`                           | 500     | anything else                                                                                  | generic message with request id                                       |
 
 **Boundaries.**
 
-- *Route handlers.* `withHandler` is the only place errors become responses: `AppError` → envelope (§9.4); unknown → logged at `error` with stack and request id, returned as 500 with the request id and a generic message. Stack traces, SQL, and internal ids never reach the client. A throw anywhere inside the handler rolls back the transaction and drops any job enqueued in it.
-- *Database.* Driver errors are translated once, in the db layer: unique violation → `ConflictError` with the field; foreign-key violation → `ValidationError`; serialization failure → retried up to 3 times then `ConflictError`; `statement_timeout` → `ExternalServiceError(retryable)`. Services never see raw `pg` errors.
-- *Pages and server components.* Data-loading failures are thrown, not returned, so `error.tsx` at the nearest segment renders a retry UI; `not-found.tsx` for missing entities; `global-error.tsx` as the last resort. Public pages prefer the last cached render over an error (§4.2 step 4).
-- *Jobs.* A job handler that throws is retried by pg-boss with exponential backoff. `ValidationError` and non-retryable `ExternalServiceError` fail immediately and raise the failed-jobs alert; there is no "retry forever". Every handler is idempotent so a retry after a partial success is safe.
-- *External services.* Every call has an explicit timeout (SMTP 10 s, payment gateway 8 s, file storage 5 s, SMS 8 s), retries with jitter only for idempotent operations, and a small in-process circuit breaker (open after 5 failures in 1 min, half-open probe every 30 s) so a dead SMTP relay cannot pin request threads. Failures isolate by module: a gateway outage degrades donations only; HMIS and CMS keep working.
-- *Process.* `unhandledRejection` and `uncaughtException` log, flush, and exit non-zero; Docker restarts the container. `SIGTERM` stops accepting requests, fails the readiness check, drains in-flight requests for 10 s, closes the pool, then exits, so deploys never cut a submission in half.
-- *Client.* One API client maps envelope codes to the behaviours in the table above. Network failures and 5xx on a submission keep the local draft, show the request id, and offer retry with the same idempotency key. The offline banner queues the current submission and retries when connectivity returns.
+- _Route handlers._ `withHandler` is the only place errors become responses: `AppError` → envelope (§9.4); unknown → logged at `error` with stack and request id, returned as 500 with the request id and a generic message. Stack traces, SQL, and internal ids never reach the client. A throw anywhere inside the handler rolls back the transaction and drops any job enqueued in it.
+- _Database._ Driver errors are translated once, in the db layer: unique violation → `ConflictError` with the field; foreign-key violation → `ValidationError`; serialization failure → retried up to 3 times then `ConflictError`; `statement_timeout` → `ExternalServiceError(retryable)`. Services never see raw `pg` errors.
+- _Pages and server components._ Data-loading failures are thrown, not returned, so `error.tsx` at the nearest segment renders a retry UI; `not-found.tsx` for missing entities; `global-error.tsx` as the last resort. Public pages prefer the last cached render over an error (§4.2 step 4).
+- _Jobs._ A job handler that throws is retried by pg-boss with exponential backoff. `ValidationError` and non-retryable `ExternalServiceError` fail immediately and raise the failed-jobs alert; there is no "retry forever". Every handler is idempotent so a retry after a partial success is safe.
+- _External services._ Every call has an explicit timeout (SMTP 10 s, payment gateway 8 s, file storage 5 s, SMS 8 s), retries with jitter only for idempotent operations, and a small in-process circuit breaker (open after 5 failures in 1 min, half-open probe every 30 s) so a dead SMTP relay cannot pin request threads. Failures isolate by module: a gateway outage degrades donations only; HMIS and CMS keep working.
+- _Process._ `unhandledRejection` and `uncaughtException` log, flush, and exit non-zero; Docker restarts the container. `SIGTERM` stops accepting requests, fails the readiness check, drains in-flight requests for 10 s, closes the pool, then exits, so deploys never cut a submission in half.
+- _Client._ One API client maps envelope codes to the behaviours in the table above. Network failures and 5xx on a submission keep the local draft, show the request id, and offer retry with the same idempotency key. The offline banner queues the current submission and retries when connectivity returns.
 
 **Forbidden patterns**, enforced by lint (`no-empty`, custom rule: a `catch` must rethrow, return an `AppError`, or call `logger.error` and rethrow) and by the PR checklist: empty `catch`; `catch (e) { return null }`; logging a write failure and continuing; converting errors to booleans; retrying non-idempotent calls; catching in a service to "keep going".
 
@@ -911,36 +912,36 @@ Implemented with Better Auth (D18) configured to the requirements below; where t
 
 Permissions are strings `<module>:<action>`. Roles are named bundles seeded by migration and editable by `super_admin` (except system roles' core permissions). Checks happen in the handler wrapper (`permission`) and inside services for row-level scope.
 
-| Permission group | super_admin | ops_admin | dentist | counsellor | volunteer | finance |
-| --- | --- | --- | --- | --- | --- | --- |
-| `users:*`, `roles:*`, `settings:*` | ✔ | read | – | – | – | – |
-| `cms:read/write/publish`, `media:*` | ✔ | ✔ | – | – | – | – |
-| `enquiries:read/write/resolve` | ✔ | ✔ | – | – | – | – |
-| `camps:read` | ✔ | ✔ | assigned | – | assigned | – |
-| `camps:write`, `clinics:*` | ✔ | ✔ | – | – | – | – |
-| `patients:read` (T2/T3 rows) | ✔ | ✔ | assigned camps + patients referred to own clinic | enrolled patients only | own registrations on the same camp day | – |
-| `patients:read_contact` (unmasked phone/address) | ✔ | ✔ | ✔ | enrolled patients | same camp day | – |
-| `patients:write` | ✔ | ✔ | ✔ | – | create, and edit own drafts | – |
-| `patients:merge`, `patients:override_duplicate` | ✔ | ✔ | ✔ | – | – | – |
-| `consents:write` | ✔ | ✔ | ✔ | – | ✔ | – |
-| `encounters:create`, `screenings:capture` (checklist, images, retakes) | ✔ | ✔ | ✔ | – | ✔ | – |
-| `encounters:transition` (per the stage tables in §8.5.8) | ✔ | reassign/close only | dentist transitions | – | volunteer transitions | – |
-| `reviews:clinical` (dentist review, findings, diagnosis, decision, treatments, prescriptions, outcomes) | ✔ | – | ✔ | – | – | – |
-| `lesions:manage` (oral lesion assessments, biopsy results, surveillance) | ✔ | – | ✔ | – | – | – |
-| `programmes:enrol` (create enrolment, set counsellor) | ✔ | ✔ | ✔ | ✔ | – | – |
-| `programmes:counsel` (sessions, status, quit date) | ✔ | – | ✔ | own enrolments | – | – |
-| `ai:models` (register, validate, deploy, retire models) | ✔ | – | validate only | – | – | – |
-| `ai:results:read` (see preliminary AI results in the review) | ✔ | – | ✔ | – | – | – |
-| `referrals:create` (from a completed review) | ✔ | – | ✔ | – | – | – |
-| `referrals:manage` (inform, accept, schedule, arrive, complete, cancel) | ✔ | ✔ | ✔ | – | inform only | – |
-| `follow_ups:manage` | ✔ | ✔ | ✔ | own enrolments | assigned | – |
-| `communications:log` | ✔ | ✔ | ✔ | enrolled patients | assigned patients | – |
-| `patients:export` | ✔ | ✔ | – | – | – | – |
-| `donations:read`, `campaigns:read` | ✔ | ✔ | – | – | – | ✔ |
-| `campaigns:write`, `donations:reconcile`, `donations:refund_request` | ✔ | – | – | – | – | ✔ |
-| `reports:read` | ✔ | ✔ | own camps/clinic | own programme | own | finance only |
-| `reports:export` | ✔ | ✔ | – | – | – | ✔ |
-| `audit:read` | ✔ | ✔ | – | – | – | finance rows |
+| Permission group                                                                                        | super_admin | ops_admin           | dentist                                          | counsellor             | volunteer                              | finance      |
+| ------------------------------------------------------------------------------------------------------- | ----------- | ------------------- | ------------------------------------------------ | ---------------------- | -------------------------------------- | ------------ |
+| `users:*`, `roles:*`, `settings:*`                                                                      | ✔           | read                | –                                                | –                      | –                                      | –            |
+| `cms:read/write/publish`, `media:*`                                                                     | ✔           | ✔                   | –                                                | –                      | –                                      | –            |
+| `enquiries:read/write/resolve`                                                                          | ✔           | ✔                   | –                                                | –                      | –                                      | –            |
+| `camps:read`                                                                                            | ✔           | ✔                   | assigned                                         | –                      | assigned                               | –            |
+| `camps:write`, `clinics:*`                                                                              | ✔           | ✔                   | –                                                | –                      | –                                      | –            |
+| `patients:read` (T2/T3 rows)                                                                            | ✔           | ✔                   | assigned camps + patients referred to own clinic | enrolled patients only | own registrations on the same camp day | –            |
+| `patients:read_contact` (unmasked phone/address)                                                        | ✔           | ✔                   | ✔                                                | enrolled patients      | same camp day                          | –            |
+| `patients:write`                                                                                        | ✔           | ✔                   | ✔                                                | –                      | create, and edit own drafts            | –            |
+| `patients:merge`, `patients:override_duplicate`                                                         | ✔           | ✔                   | ✔                                                | –                      | –                                      | –            |
+| `consents:write`                                                                                        | ✔           | ✔                   | ✔                                                | –                      | ✔                                      | –            |
+| `encounters:create`, `screenings:capture` (checklist, images, retakes)                                  | ✔           | ✔                   | ✔                                                | –                      | ✔                                      | –            |
+| `encounters:transition` (per the stage tables in §8.5.8)                                                | ✔           | reassign/close only | dentist transitions                              | –                      | volunteer transitions                  | –            |
+| `reviews:clinical` (dentist review, findings, diagnosis, decision, treatments, prescriptions, outcomes) | ✔           | –                   | ✔                                                | –                      | –                                      | –            |
+| `lesions:manage` (oral lesion assessments, biopsy results, surveillance)                                | ✔           | –                   | ✔                                                | –                      | –                                      | –            |
+| `programmes:enrol` (create enrolment, set counsellor)                                                   | ✔           | ✔                   | ✔                                                | ✔                      | –                                      | –            |
+| `programmes:counsel` (sessions, status, quit date)                                                      | ✔           | –                   | ✔                                                | own enrolments         | –                                      | –            |
+| `ai:models` (register, validate, deploy, retire models)                                                 | ✔           | –                   | validate only                                    | –                      | –                                      | –            |
+| `ai:results:read` (see preliminary AI results in the review)                                            | ✔           | –                   | ✔                                                | –                      | –                                      | –            |
+| `referrals:create` (from a completed review)                                                            | ✔           | –                   | ✔                                                | –                      | –                                      | –            |
+| `referrals:manage` (inform, accept, schedule, arrive, complete, cancel)                                 | ✔           | ✔                   | ✔                                                | –                      | inform only                            | –            |
+| `follow_ups:manage`                                                                                     | ✔           | ✔                   | ✔                                                | own enrolments         | assigned                               | –            |
+| `communications:log`                                                                                    | ✔           | ✔                   | ✔                                                | enrolled patients      | assigned patients                      | –            |
+| `patients:export`                                                                                       | ✔           | ✔                   | –                                                | –                      | –                                      | –            |
+| `donations:read`, `campaigns:read`                                                                      | ✔           | ✔                   | –                                                | –                      | –                                      | ✔            |
+| `campaigns:write`, `donations:reconcile`, `donations:refund_request`                                    | ✔           | –                   | –                                                | –                      | –                                      | ✔            |
+| `reports:read`                                                                                          | ✔           | ✔                   | own camps/clinic                                 | own programme          | own                                    | finance only |
+| `reports:export`                                                                                        | ✔           | ✔                   | –                                                | –                      | –                                      | ✔            |
+| `audit:read`                                                                                            | ✔           | ✔                   | –                                                | –                      | –                                      | finance rows |
 
 "assigned" means row-level scope via `user_camp_assignments` (camps), `clinic_staff` (clinic dentists) or `programme_enrolments.counsellor_id` (counsellors); enforced in the service query, not in the UI. Every scoped list query takes the session as a parameter and applies the scope predicate; there is no unscoped query path for non-admin roles. `super_admin` reads of T3 data are logged with purpose like everyone else's.
 
@@ -950,27 +951,27 @@ Frontend nav hides what the user cannot do. That is convenience only; the API an
 
 ## 11. Security controls by layer
 
-| Layer | Control | Where |
-| --- | --- | --- |
-| Edge | DDoS absorption, WAF managed rules, bot challenge on `/login`, `/contact`, `/donate` | Cloudflare (optional) |
-| Nginx | TLS 1.2+ only, HSTS preload, OCSP stapling; `client_max_body_size 2m` (25m on `/api/v1/media`); `limit_req` zones per route; block `/.git`, `/.env`; hide server tokens | `infra/nginx/*` |
-| Headers | `Content-Security-Policy` (nonce-based scripts, `img-src 'self' media.<domain>`, `frame-ancestors 'none'`, `connect-src 'self' api.razorpay.com`), `X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation self only) | `next.config.ts` headers + Nginx |
-| CSRF | SameSite=Lax cookie + `Origin`/`Sec-Fetch-Site` check on every non-GET in `proxy.ts`; JSON-only bodies for API | app |
-| Input | zod on every boundary; `.strict()` objects; string length caps; phone/email normalisation; HTML in CMS rich text sanitised with an allowlist (DOMPurify server-side) | app |
-| Injection | Drizzle parameterised queries only; raw SQL forbidden by lint except in `migrations/` | app |
-| AuthN | argon2id, throttling, lockout, MFA, session revocation, secure cookies | §10 |
-| AuthZ | permission check in handler wrapper + row-level scope in services; tests assert 403 for every endpoint × role matrix | §10, §17 |
-| Secrets | `.env` files outside the repo (`/srv/saathi/.env.prod`, mode 600); GitHub Actions secrets for CI; `gitleaks` pre-commit and CI; `config.ts` fails boot on missing/invalid vars; `NEXT_PUBLIC_*` limited to gateway public key and site URL | §15, §16 |
-| PHI in logs | logger redaction list derived from the schema tier annotations (§8.9): all T2/T3 fields including `phone`, `address`, `medical_history`, `dental_history`, `checklist`, `result`, `clinical_findings`, `medications`, `content_summary`; request logs carry ids not payloads; CI log-grep test | `observability/logger.ts` |
-| Uploads | multipart through the app with size and MIME limits at Nginx and in the handler; MIME sniffed server-side; images re-encoded by sharp (strips metadata/EXIF GPS); private files served only through short signed URLs | §8.3 |
-| Webhooks | HMAC signature verification, event id dedup, replay window check, processing inside transaction | §13.3 |
-| Payments | no card data touches our servers (gateway-hosted checkout); amounts trusted only from verified webhook/API fetch, never from the browser | §18 Phase 4 |
-| Database | separate roles (§8.8), no superuser at runtime, `DELETE` withheld on protected tables, TLS between containers unnecessary (private network) but `password_encryption = scram-sha-256` | `infra/postgres/init.sql` |
-| Containers | non-root user, read-only root FS for app (`.next/cache` and `/tmp` writable), `no-new-privileges`, only Nginx publishes ports, images pinned by digest, Trivy scan nightly (non-blocking, reviewed weekly) | `Dockerfile`, compose |
-| Host | SSH keys only, fail2ban, ufw (22/80/443), unattended security upgrades, Docker socket not exposed | runbook `docs/runbooks/host-setup.md` |
-| Dependencies | Dependabot monthly, grouped; `npm audit --audit-level=high` nightly; lockfile committed | `.github/*` |
-| Backups | encrypted at rest (restic), every 6 h to a separate VPS volume, mirrored to the developer's machine, monthly tested restore, keys held by the developer with a sealed copy at the organisation | §15.5, D24 |
-| Audit | append-only; every mutation of protected entities; every patient *read* by any role logged with purpose (`patient.view`); no PHI values in the audit log itself | §8.1, §8.9 |
+| Layer        | Control                                                                                                                                                                                                                                                                                        | Where                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Edge         | DDoS absorption, WAF managed rules, bot challenge on `/login`, `/contact`, `/donate`                                                                                                                                                                                                           | Cloudflare (optional)                 |
+| Nginx        | TLS 1.2+ only, HSTS preload, OCSP stapling; `client_max_body_size 2m` (25m on `/api/v1/media`); `limit_req` zones per route; block `/.git`, `/.env`; hide server tokens                                                                                                                        | `infra/nginx/*`                       |
+| Headers      | `Content-Security-Policy` (nonce-based scripts, `img-src 'self' media.<domain>`, `frame-ancestors 'none'`, `connect-src 'self' api.razorpay.com`), `X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation self only)                  | `next.config.ts` headers + Nginx      |
+| CSRF         | SameSite=Lax cookie + `Origin`/`Sec-Fetch-Site` check on every non-GET in `proxy.ts`; JSON-only bodies for API                                                                                                                                                                                 | app                                   |
+| Input        | zod on every boundary; `.strict()` objects; string length caps; phone/email normalisation; HTML in CMS rich text sanitised with an allowlist (DOMPurify server-side)                                                                                                                           | app                                   |
+| Injection    | Drizzle parameterised queries only; raw SQL forbidden by lint except in `migrations/`                                                                                                                                                                                                          | app                                   |
+| AuthN        | argon2id, throttling, lockout, MFA, session revocation, secure cookies                                                                                                                                                                                                                         | §10                                   |
+| AuthZ        | permission check in handler wrapper + row-level scope in services; tests assert 403 for every endpoint × role matrix                                                                                                                                                                           | §10, §17                              |
+| Secrets      | `.env` files outside the repo (`/srv/saathi/.env.prod`, mode 600); GitHub Actions secrets for CI; `gitleaks` pre-commit and CI; `config.ts` fails boot on missing/invalid vars; `NEXT_PUBLIC_*` limited to gateway public key and site URL                                                     | §15, §16                              |
+| PHI in logs  | logger redaction list derived from the schema tier annotations (§8.9): all T2/T3 fields including `phone`, `address`, `medical_history`, `dental_history`, `checklist`, `result`, `clinical_findings`, `medications`, `content_summary`; request logs carry ids not payloads; CI log-grep test | `observability/logger.ts`             |
+| Uploads      | multipart through the app with size and MIME limits at Nginx and in the handler; MIME sniffed server-side; images re-encoded by sharp (strips metadata/EXIF GPS); private files served only through short signed URLs                                                                          | §8.3                                  |
+| Webhooks     | HMAC signature verification, event id dedup, replay window check, processing inside transaction                                                                                                                                                                                                | §13.3                                 |
+| Payments     | no card data touches our servers (gateway-hosted checkout); amounts trusted only from verified webhook/API fetch, never from the browser                                                                                                                                                       | §18 Phase 4                           |
+| Database     | separate roles (§8.8), no superuser at runtime, `DELETE` withheld on protected tables, TLS between containers unnecessary (private network) but `password_encryption = scram-sha-256`                                                                                                          | `infra/postgres/init.sql`             |
+| Containers   | non-root user, read-only root FS for app (`.next/cache` and `/tmp` writable), `no-new-privileges`, only Nginx publishes ports, images pinned by digest, Trivy scan nightly (non-blocking, reviewed weekly)                                                                                     | `Dockerfile`, compose                 |
+| Host         | SSH keys only, fail2ban, ufw (22/80/443), unattended security upgrades, Docker socket not exposed                                                                                                                                                                                              | runbook `docs/runbooks/host-setup.md` |
+| Dependencies | Dependabot monthly, grouped; `npm audit --audit-level=high` nightly; lockfile committed                                                                                                                                                                                                        | `.github/*`                           |
+| Backups      | encrypted at rest (restic), every 6 h to a separate VPS volume, mirrored to the developer's machine, monthly tested restore, keys held by the developer with a sealed copy at the organisation                                                                                                 | §15.5, D24                            |
+| Audit        | append-only; every mutation of protected entities; every patient _read_ by any role logged with purpose (`patient.view`); no PHI values in the audit log itself                                                                                                                                | §8.1, §8.9                            |
 
 ---
 
@@ -980,20 +981,20 @@ Frontend nav hides what the user cannot do. That is convenience only; the API an
 
 Every screen's primary query is written down before its table is designed. The indexes in §8 come from these:
 
-| Screen | Query shape | Index used |
-| --- | --- | --- |
-| Public pages | published sections for slug | `cms_sections(page_id, position)` + Next.js cache |
-| Patient search box | `full_name % 'ram kumar'` or `phone = ?` or `code = ?` | `gin (full_name gin_trgm_ops)`, `(phone)`, `unique(code)` |
-| Camp day list | encounters for camp ordered by time | `(camp_id, stage)` + `(occurred_at)` |
-| Dentist review queue | encounters where stage = 'submitted' and camp in assigned, ordered by screening risk then age | `(camp_id, stage)`, `(stage, stage_changed_at)` |
-| Dentist's open reviews | dentist_reviews where dentist_id = me and status in ('in_progress','needs_info') | `(dentist_id, status)` |
-| Screening gallery | images for a screening, by view | `(screening_id, view)` |
-| Clinic referrals inbox | referrals where destination_clinic_id = ? and status in (…) | `(destination_clinic_id, status)` |
-| Follow-ups due | follow_ups where due_on <= today and status in ('scheduled','reminder_sent') | `(due_on, status)` |
-| Patient timeline | encounters + reviews + referrals + outcomes + communications by patient | `(patient_id, occurred_at desc)` and the per-table `(patient_id, …)` indexes |
-| Enquiries inbox | by status, newest first, with text search | `(status, created_at desc)`, `gin(search)` |
-| Donations ledger | by status/date, campaign | `(status, created_at desc)`, `(campaign_id)` |
-| Audit for entity | by (entity_type, entity_id) | composite index |
+| Screen                 | Query shape                                                                                   | Index used                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Public pages           | published sections for slug                                                                   | `cms_sections(page_id, position)` + Next.js cache                            |
+| Patient search box     | `full_name % 'ram kumar'` or `phone = ?` or `code = ?`                                        | `gin (full_name gin_trgm_ops)`, `(phone)`, `unique(code)`                    |
+| Camp day list          | encounters for camp ordered by time                                                           | `(camp_id, stage)` + `(occurred_at)`                                         |
+| Dentist review queue   | encounters where stage = 'submitted' and camp in assigned, ordered by screening risk then age | `(camp_id, stage)`, `(stage, stage_changed_at)`                              |
+| Dentist's open reviews | dentist_reviews where dentist_id = me and status in ('in_progress','needs_info')              | `(dentist_id, status)`                                                       |
+| Screening gallery      | images for a screening, by view                                                               | `(screening_id, view)`                                                       |
+| Clinic referrals inbox | referrals where destination_clinic_id = ? and status in (…)                                   | `(destination_clinic_id, status)`                                            |
+| Follow-ups due         | follow_ups where due_on <= today and status in ('scheduled','reminder_sent')                  | `(due_on, status)`                                                           |
+| Patient timeline       | encounters + reviews + referrals + outcomes + communications by patient                       | `(patient_id, occurred_at desc)` and the per-table `(patient_id, …)` indexes |
+| Enquiries inbox        | by status, newest first, with text search                                                     | `(status, created_at desc)`, `gin(search)`                                   |
+| Donations ledger       | by status/date, campaign                                                                      | `(status, created_at desc)`, `(campaign_id)`                                 |
+| Audit for entity       | by (entity_type, entity_id)                                                                   | composite index                                                              |
 
 ### 12.2 Rules the code follows
 
@@ -1010,29 +1011,29 @@ Every screen's primary query is written down before its table is designed. The i
 
 ### 12.3 Caching layers
 
-| Layer | What | Invalidation |
-| --- | --- | --- |
-| Browser/CDN | static assets (`/_next/static`, `/media`) immutable, 1 year | content-hashed URLs |
-| Next.js data cache | public page section reads tagged `cms:<slug>`, `settings`, `campaigns:public` | `revalidateTag` on publish/settings save; single instance so filesystem cache is correct (D11) |
-| Database | Postgres shared buffers (working set fits in RAM for years) | — |
-| Reports | live aggregate SQL in v1 (tens of thousands of rows aggregate in milliseconds); `report_snapshots` pre-aggregation is a §19 threshold | — |
+| Layer              | What                                                                                                                                  | Invalidation                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Browser/CDN        | static assets (`/_next/static`, `/media`) immutable, 1 year                                                                           | content-hashed URLs                                                                            |
+| Next.js data cache | public page section reads tagged `cms:<slug>`, `settings`, `campaigns:public`                                                         | `revalidateTag` on publish/settings save; single instance so filesystem cache is correct (D11) |
+| Database           | Postgres shared buffers (working set fits in RAM for years)                                                                           | —                                                                                              |
+| Reports            | live aggregate SQL in v1 (tens of thousands of rows aggregate in milliseconds); `report_snapshots` pre-aggregation is a §19 threshold | —                                                                                              |
 
 No permission cache (the role lookup is a 1 ms indexed query) and no query-result cache in Redis until §19 says so; premature caching here would only hide slow queries.
 
 ### 12.4 Data volumes to design for
 
-| Entity | Year 1 | Year 5 | Comment |
-| --- | --- | --- | --- |
-| Patients | 10–20 k | 100 k | Trigram index on 100 k names ≈ 30 MB; fine |
-| Encounters | 20–40 k | 250 k | Partition candidate at 1 M rows (§19) |
-| Audit rows | 200 k | 2 M | Monthly partitions from Phase 6 |
-| Donations | 1–5 k | 30 k | Trivial |
-| CMS media | 500 files, 2 GB | 10 GB | media volume, public path |
+| Entity           | Year 1                                             | Year 5     | Comment                                                                                                                                                         |
+| ---------------- | -------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Patients         | 10–20 k                                            | 100 k      | Trigram index on 100 k names ≈ 30 MB; fine                                                                                                                      |
+| Encounters       | 20–40 k                                            | 250 k      | Partition candidate at 1 M rows (§19)                                                                                                                           |
+| Audit rows       | 200 k                                              | 2 M        | Monthly partitions from Phase 6                                                                                                                                 |
+| Donations        | 1–5 k                                              | 30 k       | Trivial                                                                                                                                                         |
+| CMS media        | 500 files, 2 GB                                    | 10 GB      | media volume, public path                                                                                                                                       |
 | Screening images | 20–40 k encounters × ~5 views × ≤200 KB ≈ 20–40 GB | 150–250 GB | **The dominant storage cost.** Client-side resize to 1600 px long edge and JPEG q80 before upload; server re-encode; see §15.1 for disk sizing and §20.2 item 5 |
 
 Basis (§20.1): about 100 patients per camp day; the number of camp days per month is not fixed, so the table assumes 8–15 per month. Add AI inference at seconds per image on CPU: 500 images per camp day is under an hour of background work, well inside the same box.
 
-These numbers say: a single Postgres on a 2 vCPU/4 GB VPS is comfortably over-provisioned for the whole horizon; object storage for images is the one resource that needs a real sizing decision. Replication, sharding and read replicas are documented in §19 as *thresholds*, not plans.
+These numbers say: a single Postgres on a 2 vCPU/4 GB VPS is comfortably over-provisioned for the whole horizon; object storage for images is the one resource that needs a real sizing decision. Replication, sharding and read replicas are documented in §19 as _thresholds_, not plans.
 
 ---
 
@@ -1040,24 +1041,24 @@ These numbers say: a single Postgres on a 2 vCPU/4 GB VPS is comfortably over-pr
 
 ### 13.1 Job catalogue
 
-| Job | Trigger | Retry | Notes |
-| --- | --- | --- | --- |
-| `email.send` | enquiry received, invite, reset, receipt, referral notice | 5× exponential, 1 min → 2 h | dead-letter → alert |
-| `media.thumbnail` | screening image upload complete | 3× | thumbnail for the review gallery; CMS image variants are generated inline at upload |
-| `report.export` | admin requests CSV/PDF | 2× | writes a private media asset; the requester downloads it **from the admin, authenticated and audited**; the email only says "your export is ready" and never carries a link to PHI |
-| `donations.statutory_export` (Phase 7) | on demand, finance | 1× | Form 10BD statement and 10BE certificates for a financial year (§8.6) |
-| `webhook.reprocess` | webhook processing failure | 10× | replays stored payload |
-| `db.backup` | every 6 h | 1× + alert | `pg_dump` + media dir → restic (run by the `backup` container's cron, not pg-boss, so it works when the app is down) |
-| `sessions.prune`, `login_attempts.prune` | daily | — | housekeeping |
-| `patients.dedup_scan` | nightly | — | trigram pairwise on recent registrations → `patient_duplicates` |
-| `followups.remind` | daily 09:00 IST | — | follow-ups due within 2 days → a call task for the assigned user (no patient messaging in v1, D23) |
-| `referrals.escalate` | daily | — | no arrival after 30 days → phone follow-up task; after 60 days → `lost_to_follow_up` with reason |
-| `screenings.ai_analyse` | image set complete; enabled in Phase 5 once a validated model is deployed (§8.5.10) | 3× | calls `ai-inference`, writes a `screening_results` row with `source='ai_model'`; failure never blocks the dentist review |
-| `ai.labels_materialise` | nightly | — | derives `labels` from completed dentist reviews for the training pipeline |
-| `cessation.sessions_due` | daily 08:00 IST | — | sessions due in 7 days onto the counsellor worklist; missed sessions → call task |
-| `lesions.surveillance_due` | daily | — | open assessments past `review_interval_weeks` → follow-up task and dashboard flag |
-| `donations.reconcile` (Phase 7) | hourly | 3× | fetch gateway orders in `pending` > 30 min, fix state |
-| `privacy.anonymise` | monthly, **disabled until a retention period is configured** | — | retention policy from §8.9 |
+| Job                                      | Trigger                                                                             | Retry                       | Notes                                                                                                                                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `email.send`                             | enquiry received, invite, reset, receipt, referral notice                           | 5× exponential, 1 min → 2 h | dead-letter → alert                                                                                                                                                                |
+| `media.thumbnail`                        | screening image upload complete                                                     | 3×                          | thumbnail for the review gallery; CMS image variants are generated inline at upload                                                                                                |
+| `report.export`                          | admin requests CSV/PDF                                                              | 2×                          | writes a private media asset; the requester downloads it **from the admin, authenticated and audited**; the email only says "your export is ready" and never carries a link to PHI |
+| `donations.statutory_export` (Phase 7)   | on demand, finance                                                                  | 1×                          | Form 10BD statement and 10BE certificates for a financial year (§8.6)                                                                                                              |
+| `webhook.reprocess`                      | webhook processing failure                                                          | 10×                         | replays stored payload                                                                                                                                                             |
+| `db.backup`                              | every 6 h                                                                           | 1× + alert                  | `pg_dump` + media dir → restic (run by the `backup` container's cron, not pg-boss, so it works when the app is down)                                                               |
+| `sessions.prune`, `login_attempts.prune` | daily                                                                               | —                           | housekeeping                                                                                                                                                                       |
+| `patients.dedup_scan`                    | nightly                                                                             | —                           | trigram pairwise on recent registrations → `patient_duplicates`                                                                                                                    |
+| `followups.remind`                       | daily 09:00 IST                                                                     | —                           | follow-ups due within 2 days → a call task for the assigned user (no patient messaging in v1, D23)                                                                                 |
+| `referrals.escalate`                     | daily                                                                               | —                           | no arrival after 30 days → phone follow-up task; after 60 days → `lost_to_follow_up` with reason                                                                                   |
+| `screenings.ai_analyse`                  | image set complete; enabled in Phase 5 once a validated model is deployed (§8.5.10) | 3×                          | calls `ai-inference`, writes a `screening_results` row with `source='ai_model'`; failure never blocks the dentist review                                                           |
+| `ai.labels_materialise`                  | nightly                                                                             | —                           | derives `labels` from completed dentist reviews for the training pipeline                                                                                                          |
+| `cessation.sessions_due`                 | daily 08:00 IST                                                                     | —                           | sessions due in 7 days onto the counsellor worklist; missed sessions → call task                                                                                                   |
+| `lesions.surveillance_due`               | daily                                                                               | —                           | open assessments past `review_interval_weeks` → follow-up task and dashboard flag                                                                                                  |
+| `donations.reconcile` (Phase 7)          | hourly                                                                              | 3×                          | fetch gateway orders in `pending` > 30 min, fix state                                                                                                                              |
+| `privacy.anonymise`                      | monthly, **disabled until a retention period is configured**                        | —                           | retention policy from §8.9                                                                                                                                                         |
 
 ### 13.2 Guarantees
 
@@ -1108,18 +1109,18 @@ A free hosted uptime monitor (D24): HTTPS check of `/api/health/ready` every 5 m
 
 ### 14.4 Alerts and how each is raised
 
-| Alert | Condition | Raised by |
-| --- | --- | --- |
-| Site down | 2 consecutive failed readiness checks | hosted uptime monitor |
-| VPS or cron dead | no check.sh heartbeat for 15 min | hosted uptime monitor |
-| Error rate | > 20 5xx responses in the last 5 min (from app logs) | check.sh |
-| Latency | p95 of last 5 min > 1.5 s (from app logs `duration_ms`) | check.sh |
-| Database | `SELECT 1` fails; connections > 80 % of max; longest transaction > 60 s; any table bloat warning from monthly report | check.sh |
-| Disk | any volume > 80 % (the most likely outage: dumps and images) | check.sh |
-| Jobs | any pg-boss job in `failed` younger than 24 h; queue depth > 500 | check.sh |
-| Security | > 50 login failures / 10 min from one IP; any webhook signature failure; any patient-search rate-limit trip | check.sh (from logs) |
-| Backups | newest restic snapshot older than 7 h; developer-machine mirror older than 3 days; last restore test failed or older than 35 days | check.sh |
-| Certificates | expiry < 14 days | hosted uptime monitor |
+| Alert            | Condition                                                                                                                         | Raised by             |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| Site down        | 2 consecutive failed readiness checks                                                                                             | hosted uptime monitor |
+| VPS or cron dead | no check.sh heartbeat for 15 min                                                                                                  | hosted uptime monitor |
+| Error rate       | > 20 5xx responses in the last 5 min (from app logs)                                                                              | check.sh              |
+| Latency          | p95 of last 5 min > 1.5 s (from app logs `duration_ms`)                                                                           | check.sh              |
+| Database         | `SELECT 1` fails; connections > 80 % of max; longest transaction > 60 s; any table bloat warning from monthly report              | check.sh              |
+| Disk             | any volume > 80 % (the most likely outage: dumps and images)                                                                      | check.sh              |
+| Jobs             | any pg-boss job in `failed` younger than 24 h; queue depth > 500                                                                  | check.sh              |
+| Security         | > 50 login failures / 10 min from one IP; any webhook signature failure; any patient-search rate-limit trip                       | check.sh (from logs)  |
+| Backups          | newest restic snapshot older than 7 h; developer-machine mirror older than 3 days; last restore test failed or older than 35 days | check.sh              |
+| Certificates     | expiry < 14 days                                                                                                                  | hosted uptime monitor |
 
 ### 14.5 Health endpoints
 
@@ -1141,16 +1142,16 @@ There is no backup host in v1 (D24). The restic repository lives on the attached
 
 ### 15.2 Containers (`infra/compose.yaml`, profiles: `core`, `dev`, `staging`, `observability`)
 
-| Service | Image | Profile | Memory limit | Notes |
-| --- | --- | --- | --- | --- |
-| `nginx` | nginx:1.27 | core | 64 MB | only service publishing 80/443; TLS via Cloudflare Origin CA or certbot; serves `/media/public/*` from the media volume |
-| `app` | ghcr.io/saathi-cares/app:<sha> | core | 768 MB | Next.js standalone + in-process pg-boss consumer; non-root; read-only root FS with `.next/cache` and `/tmp` writable; media volume mounted; healthcheck `/api/health/ready` |
-| `migrate` | same image, `node migrate.js` | core (one-shot) | 256 MB | runs with `saathi_owner` before `app` (`depends_on: condition: service_completed_successfully`); keeps owner credentials out of the app container |
-| `postgres` | postgres:16 | core | 1.5 GB | volume `pgdata` on the encrypted volume; `postgresql.conf` from repo; `init.sql` creates roles and extensions |
-| `backup` | custom (postgres client + restic + cron) | core | 128 MB | `pg_dump` every 6 h + media directory → restic repository on the attached volume; exposes the repository read-only over SSH for the developer-machine mirror; also runs disk and backup-age checks so they work if the app is down |
-| `ai-inference` | custom Python image (FastAPI + ONNX Runtime CPU), models mounted read-only | core from Phase 5 | 1 GB | internal network only; `GET /v1/health`, `POST /v1/analyse`; scaled to 0 replicas until a validated model is deployed |
-| `mailpit` | axllent/mailpit | dev | 64 MB | catches all dev and staging email at `localhost:8025` |
-| `prometheus`, `grafana`, `postgres_exporter`, `node_exporter` | official | observability (off by default) | ~600 MB total | enabled at the §19 trigger; Grafana behind Nginx `/grafana` with auth and IP allowlist |
+| Service                                                       | Image                                                                      | Profile                        | Memory limit  | Notes                                                                                                                                                                                                                              |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nginx`                                                       | nginx:1.27                                                                 | core                           | 64 MB         | only service publishing 80/443; TLS via Cloudflare Origin CA or certbot; serves `/media/public/*` from the media volume                                                                                                            |
+| `app`                                                         | ghcr.io/saathi-cares/app:<sha>                                             | core                           | 768 MB        | Next.js standalone + in-process pg-boss consumer; non-root; read-only root FS with `.next/cache` and `/tmp` writable; media volume mounted; healthcheck `/api/health/ready`                                                        |
+| `migrate`                                                     | same image, `node migrate.js`                                              | core (one-shot)                | 256 MB        | runs with `saathi_owner` before `app` (`depends_on: condition: service_completed_successfully`); keeps owner credentials out of the app container                                                                                  |
+| `postgres`                                                    | postgres:16                                                                | core                           | 1.5 GB        | volume `pgdata` on the encrypted volume; `postgresql.conf` from repo; `init.sql` creates roles and extensions                                                                                                                      |
+| `backup`                                                      | custom (postgres client + restic + cron)                                   | core                           | 128 MB        | `pg_dump` every 6 h + media directory → restic repository on the attached volume; exposes the repository read-only over SSH for the developer-machine mirror; also runs disk and backup-age checks so they work if the app is down |
+| `ai-inference`                                                | custom Python image (FastAPI + ONNX Runtime CPU), models mounted read-only | core from Phase 5              | 1 GB          | internal network only; `GET /v1/health`, `POST /v1/analyse`; scaled to 0 replicas until a validated model is deployed                                                                                                              |
+| `mailpit`                                                     | axllent/mailpit                                                            | dev                            | 64 MB         | catches all dev and staging email at `localhost:8025`                                                                                                                                                                              |
+| `prometheus`, `grafana`, `postgres_exporter`, `node_exporter` | official                                                                   | observability (off by default) | ~600 MB total | enabled at the §19 trigger; Grafana behind Nginx `/grafana` with auth and IP allowlist                                                                                                                                             |
 
 Resident memory budget with `core` only: about 2.6 GB including the OS, leaving room for a `staging` project to be started on demand. Networks: `edge` (nginx ↔ app), `internal` (app/migrate/backup ↔ postgres); only nginx is on both. Every service has a memory limit so one runaway container cannot take the box down.
 
@@ -1160,11 +1161,11 @@ Multi-stage as in the Next.js self-hosting reference: `deps` → `builder` (`nex
 
 ### 15.4 Environments
 
-| Env | Where | Data | Purpose |
-| --- | --- | --- | --- |
-| `dev` | developer laptop, `docker compose --profile dev up` for Postgres and Mailpit; `npm run dev` on the host for hot reload | synthetic seed (`scripts/seed`) | daily work |
+| Env       | Where                                                                                                                                 | Data                                                                                                                                                                | Purpose                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `dev`     | developer laptop, `docker compose --profile dev up` for Postgres and Mailpit; `npm run dev` on the host for hot reload                | synthetic seed (`scripts/seed`)                                                                                                                                     | daily work                                                     |
 | `staging` | same VPS, second compose project (`-p staging`, profile `staging`, small limits) **started on demand** for UAT and stopped afterwards | synthetic seed only, **never a copy of production**; the earlier idea of an anonymised production dump was cut because the anonymiser is itself a PHI-handling risk | UAT by SaathiCares staff before each release; pilot rehearsals |
-| `prod` | VPS | real | deployed from a Git tag `v*` |
+| `prod`    | VPS                                                                                                                                   | real                                                                                                                                                                | deployed from a Git tag `v*`                                   |
 
 Config is env-only (`src/server/config.ts`, zod-validated). `.env.example` is the complete list with comments; the app refuses to boot if anything required is missing or malformed. Production env files live at `/srv/saathi/.env.prod`, mode 600, outside the repo.
 
@@ -1214,16 +1215,16 @@ Target under 8 minutes. `nightly.yml` runs the full Playwright suite, `npm audit
 
 ## 17. Testing strategy
 
-| Level | Tool | What | Where it runs |
-| --- | --- | --- | --- |
-| Unit | Vitest | pure functions: stage machines (encounter, referral, dentist review, donation), dedup scoring, zod schemas including clinical value ranges (BP 60–250, temperature 34–42 °C, SpO2 50–100, pulse 30–220), DTO mappers, permission resolution, receipt numbering | every push, < 30 s |
-| Integration | Vitest + GitHub Actions Postgres service | each service against real Postgres: transactions, constraints, idempotency, scope predicates, audit rows written; **authorisation matrix test**: every `/api/v1` endpoint × every role asserts 200/403 from a generated table so a new endpoint without a permission fails the build; **privacy tests**: audit rows for T2/T3 entities contain no values, signed media URLs expire, contact fields are masked without `patients:read_contact`, a full run's log output contains no seeded names or phone numbers | every push |
-| E2E smoke | Playwright | login + MFA; register a patient with photos on a 360 px phone viewport (and the same flow at 768 px nightly); dentist review and refer; CMS publish shows on the public page | every push (4 flows) |
-| E2E full | Playwright | the complete pathway in §18 Phase 3's exit criteria; contact form → enquiry → Mailpit; lesion and cessation flows; AI result visible in a review (Phase 5); donation happy path in gateway test mode (Phase 7) | nightly |
-| Load check | `scripts/load-smoke.ts` (plain Node, no k6) | 10 simulated phones submitting encounters with photos for 10 minutes; records p95 and error count | before the first live camp in Phase 2 and Phase 3, on staging |
-| AI model | `ai/evaluate.py` against the dentist-labelled held-out set | sensitivity and specificity per condition above the thresholds in the model manifest; a model that regresses cannot be marked `validated`; the inference API contract test runs the container against three fixture images | before every model deploy; contract test on every push |
-| Security | authz matrix, gitleaks, Trivy, npm audit, the 20-item checklist in Phase 6 | CI + Phase 6 |
-| Restore | monthly restore test on the VPS, quarterly against the developer-machine mirror | backups are real | scheduled |
+| Level       | Tool                                                                            | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Where it runs                                                 |
+| ----------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Unit        | Vitest                                                                          | pure functions: stage machines (encounter, referral, dentist review, donation), dedup scoring, zod schemas including clinical value ranges (BP 60–250, temperature 34–42 °C, SpO2 50–100, pulse 30–220), DTO mappers, permission resolution, receipt numbering                                                                                                                                                                                                                                                   | every push, < 30 s                                            |
+| Integration | Vitest + GitHub Actions Postgres service                                        | each service against real Postgres: transactions, constraints, idempotency, scope predicates, audit rows written; **authorisation matrix test**: every `/api/v1` endpoint × every role asserts 200/403 from a generated table so a new endpoint without a permission fails the build; **privacy tests**: audit rows for T2/T3 entities contain no values, signed media URLs expire, contact fields are masked without `patients:read_contact`, a full run's log output contains no seeded names or phone numbers | every push                                                    |
+| E2E smoke   | Playwright                                                                      | login + MFA; register a patient with photos on a 360 px phone viewport (and the same flow at 768 px nightly); dentist review and refer; CMS publish shows on the public page                                                                                                                                                                                                                                                                                                                                     | every push (4 flows)                                          |
+| E2E full    | Playwright                                                                      | the complete pathway in §18 Phase 3's exit criteria; contact form → enquiry → Mailpit; lesion and cessation flows; AI result visible in a review (Phase 5); donation happy path in gateway test mode (Phase 7)                                                                                                                                                                                                                                                                                                   | nightly                                                       |
+| Load check  | `scripts/load-smoke.ts` (plain Node, no k6)                                     | 10 simulated phones submitting encounters with photos for 10 minutes; records p95 and error count                                                                                                                                                                                                                                                                                                                                                                                                                | before the first live camp in Phase 2 and Phase 3, on staging |
+| AI model    | `ai/evaluate.py` against the dentist-labelled held-out set                      | sensitivity and specificity per condition above the thresholds in the model manifest; a model that regresses cannot be marked `validated`; the inference API contract test runs the container against three fixture images                                                                                                                                                                                                                                                                                       | before every model deploy; contract test on every push        |
+| Security    | authz matrix, gitleaks, Trivy, npm audit, the 20-item checklist in Phase 6      | CI + Phase 6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Restore     | monthly restore test on the VPS, quarterly against the developer-machine mirror | backups are real                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | scheduled                                                     |
 
 Test-first is required for the code that can hurt someone: stage machines, permissions and scope, dedup and merge, money and receipts, consent enforcement. UI glue is tested through the smoke flows; there is no coverage percentage target.
 
@@ -1231,7 +1232,7 @@ Test-first is required for the code that can hurt someone: stage machines, permi
 
 ## 18. Delivery phases
 
-**Order rationale.** The public website already works on the no-code platform; the real pain is patient data in spreadsheets and forms. So the HMIS reaches a real camp before the website is rebuilt, and everything that protects patient data (backups, restore test, alerting, privacy controls, MFA, audit) is in place *before* the first real patient record, not in a final hardening phase. The council review (§22) was unanimous on this reordering.
+**Order rationale.** The public website already works on the no-code platform; the real pain is patient data in spreadsheets and forms. So the HMIS reaches a real camp before the website is rebuilt, and everything that protects patient data (backups, restore test, alerting, privacy controls, MFA, audit) is in place _before_ the first real patient record, not in a final hardening phase. The council review (§22) was unanimous on this reordering.
 
 Each phase is delivered module by module (§23.1) and ends with a demo on staging, the exit criteria checked, a tagged release, and a short note in `docs/adr/`. Indicative durations assume one developer at roughly half time. The council judged the original estimates optimistic by 1.5–2×; the nominal total below to the end of Phase 6 is about 33 weeks (Phase 5 can overlap Phase 4), so plan for **10–14 calendar months** and treat each phase's exit criteria, not its week count, as the commitment. Camp dates and donation decisions are not development dependencies (§20.1); the live camps are validation points, not gates on the next phase's code.
 
@@ -1265,7 +1266,8 @@ Exit criteria: authz matrix covers 100 % of endpoints; a disabled user's session
 
 **Goal:** volunteers register patients with a recorded acknowledgement, demographics, medical and dental history, vitals, an oral screening checklist and photos on their own phones; the dentist on the ground reviews the same day, records findings on a tooth chart, and decides. Ends with the first real camp run on the platform. Replaces the Volunteer portal and the HMIS review screens.
 
-*Drop 2a — Patient, camp, screening capture (≈ 4 weeks)*
+_Drop 2a — Patient, camp, screening capture (≈ 4 weeks)_
+
 - Clinics CRUD with staff; camps CRUD with staffing (volunteers, dentists), status lifecycle, camp-day summary.
 - Patient master with codes and optional ABHA (encrypted, HMAC lookup; Aadhaar is never stored); the single `care_and_data` acknowledgement (D23); search (trigram/phone/code) with ranking; dedup at create (name similarity + phone + village + age band → existing / possible duplicate / new); override with permission; merge tool; nightly dedup scan and review screen.
 - Mobile-first registration flow (360 px phones first, then tablets and laptops; large targets, stepper): 1 identity and acknowledgement → 2 demographics → 3 medical history checklist → 4 dental history checklist → 5 vitals with range validation → 6 oral screening checklist → 7 photos: guided capture per view using the phone camera, client-side resize and compress, upload with progress, retake, quality flags → 8 review and submit. Autosave to encrypted IndexedDB every 10 s; `Idempotency-Key` per form open; a connectivity banner with retry for the current submission (camps have mobile data; no offline mode).
@@ -1273,7 +1275,8 @@ Exit criteria: authz matrix covers 100 % of endpoints; a disabled user's session
 - Privacy controls that touch capture: private media path with signed URLs, EXIF stripping, contact masking, purpose-logged reads, per-user search rate limits, log redaction test.
 - No legacy import: existing records are on paper only (§20). Ops admins can back-enter selected paper records through the same registration form if the organisation wants history in the system.
 
-*Drop 2b — Dentist review and clinical records (≈ 3 weeks)*
+_Drop 2b — Dentist review and clinical records (≈ 3 weeks)_
+
 - Dentist review queue (by camp, screening risk, age of submission); review screen: image gallery with zoom and view labels, checklist and histories side by side, tooth chart (FDI notation) for findings, soft tissue and periodontal status, diagnosis with ICD-10 K00–K14 lookup, risk level, decision with reason, advice given; `needs_info` loop back to the volunteer; re-review with supersession.
 - Camp-side treatments and prescriptions recorded from the review; structured medications; prescription print sheet (A5, Hindi and English labels) and delivery record (printed / none in this phase).
 - Patient timeline (encounters, screenings, reviews in one scroll).
@@ -1286,13 +1289,14 @@ Exit criteria: e2e passes (phone registration with histories and five photos →
 
 **Goal:** the referred patient reaches the Saathi clinic with full context; treatment, outcome and follow-up are recorded; oral cancer surveillance and tobacco cessation run as programmes on the same records; every phone call or in-person notice to a patient is logged; the organisation can see its camp-to-clinic funnel and its programme outcomes. The second live camp includes the clinic leg.
 
-*Drop 3a — Referral, clinic, outcome, follow-up (≈ 4 weeks)*
+_Drop 3a — Referral, clinic, outcome, follow-up (≈ 4 weeks)_
 
 - Referral created from a completed review with structured reason codes, details, recommended procedures and urgency; "patient informed" step logging how the patient was told (in person at the camp, or a phone call; no messaging channels, D23); clinic inbox by status; accept, schedule, arrive; `start clinic encounter` creates the continuity-linked encounter with camp images, review and referral shown above the clinic assessment form; clinic review, treatments, prescriptions; outcome recording; follow-ups with due dates and call tasks; lost-to-follow-up escalation; cancel with reason.
 - Patient communications log for calls and in-person notices, inbound and outbound.
 - Clinic day schedule built from scheduled referrals and due follow-ups (D27).
 
-*Drop 3b — Programmes: oral cancer surveillance and tobacco cessation (≈ 2 weeks)*
+_Drop 3b — Programmes: oral cancer surveillance and tobacco cessation (≈ 2 weeks)_
+
 - Oral lesion assessment from the dentist review (§8.5.9): lesion type, site, features, images, risk, action; surveillance follow-ups at the chosen interval; biopsy referral with reason code and result recording; open-assessment list on the dentist dashboard; lost-to-follow-up escalation.
 - Tobacco cessation: enrolment from the review or by a counsellor, baseline (products, quantity, years, Fagerström score, readiness), default session schedule from settings, counsellor worklist, session recording by phone or in person, quit status tracking, NRT or pharmacotherapy noted against a prescription, status outcomes; `counsellor` role and scope.
 - HMIS reporting as live SQL in the admin: dashboard tiles per role, camp funnel (registered → screened → reviewed → referred → arrived → treated → outcome), patients by geography, referral status, treatment outcomes, staff activity, OPMD detection and biopsy completion, cessation enrolments, adherence and quit rates; CSV export through the permissioned, audited download path.
@@ -1361,25 +1365,25 @@ Monthly: dependency updates, check.sh monthly report review, restore test result
 
 ## 19. Scale thresholds: when to switch on what we left off
 
-| Signal (from the check.sh monthly report, logs, or Grafana once enabled) | Action | Effort |
-| --- | --- | --- |
-| App CPU > 70 % sustained or p95 > 1 s with healthy DB | Second `app` replica → add Redis for shared Next.js cache handler, sessions and rate limits; Nginx upstream round-robin | 2–3 days (D11) |
-| Postgres connections > 60 % of `max_connections` | PgBouncer in transaction mode in front of Postgres | 1 day |
-| `encounters` > 1 M rows or `audit_log` > 5 M | Range-partition by month; archive partitions older than 3 years to cold storage | 2 days |
-| Read-heavy reports slow production writes | Streaming read replica; route `reports` and exporters to it via a second pool | 2 days + second VPS |
-| DB > 60 % RAM working set | Upgrade VPS (vertical) before anything else; cheapest option | hours |
-| Job throughput > ~1 000/min or multi-consumer fan-out needed | Move queue to Redis/BullMQ; only consider Kafka if event streaming to other systems appears | 1 week |
-| Second backend service or external API consumers | Introduce an API gateway (Traefik/Kong) and split the `server/modules` behind it | as needed |
-| Patient search p95 > 200 ms at > 500 k rows | Materialised search table; only then evaluate OpenSearch | 3 days |
-| Two organisations want the platform | Tenant column strategy ADR; RLS becomes worth its cost | separate project |
-| Log aggregation (Loki or similar) | more than one host, or an incident where `docker logs` + `jq` failed to answer the question | 1 day |
-| Prometheus + Grafana `observability` profile | a slowdown nobody can explain from logs and `pg_stat_statements`; or a second app replica | 1 day (profile already in repo) |
-| Object storage (MinIO or a bucket) via the `s3` adapter | images above 60 % of the volume with no cheap volume upgrade, or a second host needing the files | 1 day |
-| Separate worker container (`worker.ts`) | exports or PDFs measurably slow requests, or job concurrency needs to exceed 2 | hours |
-| `report_snapshots` pre-aggregation | dashboard p95 > 1 s from live SQL | 2 days |
-| Always-on staging | a second developer or weekly releases | hours |
-| pgBackRest WAL archiving | database > 5 GB, or the organisation asks for RPO under 6 h | 2 days |
-| GPU or larger CPU for inference | AI results arrive later than the dentist review starts on a typical camp day, or a model too large for CPU is adopted | move the `ai-inference` container to a GPU host behind the same internal API |
+| Signal (from the check.sh monthly report, logs, or Grafana once enabled) | Action                                                                                                                  | Effort                                                                       |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| App CPU > 70 % sustained or p95 > 1 s with healthy DB                    | Second `app` replica → add Redis for shared Next.js cache handler, sessions and rate limits; Nginx upstream round-robin | 2–3 days (D11)                                                               |
+| Postgres connections > 60 % of `max_connections`                         | PgBouncer in transaction mode in front of Postgres                                                                      | 1 day                                                                        |
+| `encounters` > 1 M rows or `audit_log` > 5 M                             | Range-partition by month; archive partitions older than 3 years to cold storage                                         | 2 days                                                                       |
+| Read-heavy reports slow production writes                                | Streaming read replica; route `reports` and exporters to it via a second pool                                           | 2 days + second VPS                                                          |
+| DB > 60 % RAM working set                                                | Upgrade VPS (vertical) before anything else; cheapest option                                                            | hours                                                                        |
+| Job throughput > ~1 000/min or multi-consumer fan-out needed             | Move queue to Redis/BullMQ; only consider Kafka if event streaming to other systems appears                             | 1 week                                                                       |
+| Second backend service or external API consumers                         | Introduce an API gateway (Traefik/Kong) and split the `server/modules` behind it                                        | as needed                                                                    |
+| Patient search p95 > 200 ms at > 500 k rows                              | Materialised search table; only then evaluate OpenSearch                                                                | 3 days                                                                       |
+| Two organisations want the platform                                      | Tenant column strategy ADR; RLS becomes worth its cost                                                                  | separate project                                                             |
+| Log aggregation (Loki or similar)                                        | more than one host, or an incident where `docker logs` + `jq` failed to answer the question                             | 1 day                                                                        |
+| Prometheus + Grafana `observability` profile                             | a slowdown nobody can explain from logs and `pg_stat_statements`; or a second app replica                               | 1 day (profile already in repo)                                              |
+| Object storage (MinIO or a bucket) via the `s3` adapter                  | images above 60 % of the volume with no cheap volume upgrade, or a second host needing the files                        | 1 day                                                                        |
+| Separate worker container (`worker.ts`)                                  | exports or PDFs measurably slow requests, or job concurrency needs to exceed 2                                          | hours                                                                        |
+| `report_snapshots` pre-aggregation                                       | dashboard p95 > 1 s from live SQL                                                                                       | 2 days                                                                       |
+| Always-on staging                                                        | a second developer or weekly releases                                                                                   | hours                                                                        |
+| pgBackRest WAL archiving                                                 | database > 5 GB, or the organisation asks for RPO under 6 h                                                             | 2 days                                                                       |
+| GPU or larger CPU for inference                                          | AI results arrive later than the dentist review starts on a typical camp day, or a model too large for CPU is adopted   | move the `ai-inference` container to a GPU host behind the same internal API |
 
 Sharding is not on this table. At the data volumes in §12.4, a single Postgres will not need it within the planning horizon; the correct first steps are always vertical scaling, indexes, partitioning and a read replica, in that order.
 
@@ -1389,41 +1393,41 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 
 ### 20.1 Answered on 2026-09-28 (product owner) and applied
 
-| # | Question | Answer | Applied where |
-| --- | --- | --- | --- |
-| 1 | Hosting budget | Approved; choose the minimum | §15.1: cheapest 2 vCPU / 4 GB VPS with a growable attached volume |
-| 2 | Consent and retention | Camps are voluntary; consent is not asked today, so no consent system and no retention period yet | D23, §8.5.1, §8.9 rules 7–8: one-tap acknowledgement, anonymisation job written but disabled |
-| 3 | Backup host | None; the developer's machine holds the off-site copy | D24, §15.5: on-VPS restic repository mirrored to the developer's machine |
-| 4 | Cloudflare proxy | On, since it is free | §15.1: proxy on, Origin CA certificate, no certbot |
-| 5 | Trustees and break-glass | Not now; the organisation has no technical staff | D24, §10.1: developer holds keys, sealed copy to the founder |
-| 6 | SMTP | Normal Gmail account with an app password (to be confirmed) | §5 Email row; ~500/day limit noted |
-| 7 | Dentist review timing | Dentist is on the ground; "record on behalf of" feature only when asked | §8.5.8 unchanged (same-day review); feature parked |
-| 8 | Patient identifiers | Aadhaar never stored | §8.5.1 |
-| 9 | Connectivity | Online over mobile data; no offline mode; must work well on phones | §2, §18 Phase 2: 360 px mobile-first, connectivity banner only |
-| 10 | Historical data | On paper only, no digital tools | §18 Phase 2: no import; optional manual back-entry |
-| 11 | Image storage | Will exist; scale unknown | §15.1: growable attached volume; `StorageAdapter` keeps S3 possible |
-| 12 | Who may view photographs | Anyone with admin or dentist access | §10.2 matrix already grants this; research use removed (§8.9 rule 8) |
-| 13 | "Pilot" | Clarified: the first real camp run on the platform instead of paper | §18 Phase 2 wording |
-| 14 | Patient messaging | Dropped; internal alerts may use Slack or Discord | D23, §4.3, §13.1: call and in-person log only; alert channel Slack or Discord |
-| 15 | Languages | English only | §18 Phase 2b: Hindi labels on the prescription print sheet only if asked |
-| 16 | CAPTCHA | ALTCHA | §18 Phase 4 |
-| 17 | Gateway and 80G | Parked; organisation to be asked | §18 Phase 7 marked parked |
-| 18 | AI screening | To be asked whether it is in scope | schema ready (§8.5.5); job disabled |
-| 19 | SMTP account | A Gmail address will be provided | §5; app password to be created by the account owner |
-| 20 | Alert channel | Slack | §14.2 |
-| 21 | Volume | About 100 patients per camp day | §12.4 basis |
-| 22 | Photo views | Dentist will confirm; not a hard cap, depends on the case | §8.5.5: at least one image, no maximum, views are guidance |
-| 23 | AI screening | **In scope** | D25, §8.5.10, §18 Phase 5, `ai-inference` container |
-| 24 | Camp date and 80G | Must not affect development | Phase 5 (AI) no longer waits on a live camp date; donations remain Phase 7 and parked |
-| 25 | Development style | Module-wise so nothing tangles; no low-quality generated code; documentation maintained for hand-over; internal and external APIs versioned | D26, §23 |
-| 26 | Product scope (message received 2026-09-29) | A dental EMR built for camps, linked to the clinic: dental screening and treatment camps, clinic operations, oral cancer and tobacco cessation services | §1, §8.5.9 programmes, D27 clinic operations scope, §18 Phase 3 |
-| 27 | Who counsels; camp flow | The dentist counsels. The volunteer registers the patient, takes vitals, records the complaint and habits, and drafts a structured summary for the dentist | §8.5.8 flow confirmed; `counsellor` is a role the dentist holds by default (a trained volunteer can be given it later); the registration steps in Phase 2 are the "structured summary" |
-| 28 | Oral cancer pathway partners | Any partner facility, depending on future partnerships; no one-to-one hospital integration | §8.5.9: `external_facility_name` free text on referrals; biopsy result recorded manually when known; no interface to any hospital system |
-| 29 | AI | Later in development; not excluded; assists the dentist, never decides | D25 unchanged; Phase 5 stays after the HMIS phases |
-| 30 | Clinic operations | D27 reading confirmed | no change |
-| 31 | Secrets and webhook URLs | The developer fills them into the env file; the plan must produce `.env.example` listing every variable | Phase 0 deliverable (§23.5 item 9); `config.ts` refuses to boot without them |
-| 32 | Truthfulness of the built system | Past experience: an assistant described a Redis cache flow that did not exist in the code. Nothing in this platform may be described as doing something the code does not do | §23.6 (new), and the working agreement in §23.7 |
-| 33 | AI-assisted development set-up | Fable orchestrates and decides with the product owner; Opus subagents for development; Sonnet subagents for read-only work; to be written into `CLAUDE.md` when that file is created (not yet) | §23.7 |
+| #   | Question                                    | Answer                                                                                                                                                                                         | Applied where                                                                                                                                                                          |
+| --- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Hosting budget                              | Approved; choose the minimum                                                                                                                                                                   | §15.1: cheapest 2 vCPU / 4 GB VPS with a growable attached volume                                                                                                                      |
+| 2   | Consent and retention                       | Camps are voluntary; consent is not asked today, so no consent system and no retention period yet                                                                                              | D23, §8.5.1, §8.9 rules 7–8: one-tap acknowledgement, anonymisation job written but disabled                                                                                           |
+| 3   | Backup host                                 | None; the developer's machine holds the off-site copy                                                                                                                                          | D24, §15.5: on-VPS restic repository mirrored to the developer's machine                                                                                                               |
+| 4   | Cloudflare proxy                            | On, since it is free                                                                                                                                                                           | §15.1: proxy on, Origin CA certificate, no certbot                                                                                                                                     |
+| 5   | Trustees and break-glass                    | Not now; the organisation has no technical staff                                                                                                                                               | D24, §10.1: developer holds keys, sealed copy to the founder                                                                                                                           |
+| 6   | SMTP                                        | Normal Gmail account with an app password (to be confirmed)                                                                                                                                    | §5 Email row; ~500/day limit noted                                                                                                                                                     |
+| 7   | Dentist review timing                       | Dentist is on the ground; "record on behalf of" feature only when asked                                                                                                                        | §8.5.8 unchanged (same-day review); feature parked                                                                                                                                     |
+| 8   | Patient identifiers                         | Aadhaar never stored                                                                                                                                                                           | §8.5.1                                                                                                                                                                                 |
+| 9   | Connectivity                                | Online over mobile data; no offline mode; must work well on phones                                                                                                                             | §2, §18 Phase 2: 360 px mobile-first, connectivity banner only                                                                                                                         |
+| 10  | Historical data                             | On paper only, no digital tools                                                                                                                                                                | §18 Phase 2: no import; optional manual back-entry                                                                                                                                     |
+| 11  | Image storage                               | Will exist; scale unknown                                                                                                                                                                      | §15.1: growable attached volume; `StorageAdapter` keeps S3 possible                                                                                                                    |
+| 12  | Who may view photographs                    | Anyone with admin or dentist access                                                                                                                                                            | §10.2 matrix already grants this; research use removed (§8.9 rule 8)                                                                                                                   |
+| 13  | "Pilot"                                     | Clarified: the first real camp run on the platform instead of paper                                                                                                                            | §18 Phase 2 wording                                                                                                                                                                    |
+| 14  | Patient messaging                           | Dropped; internal alerts may use Slack or Discord                                                                                                                                              | D23, §4.3, §13.1: call and in-person log only; alert channel Slack or Discord                                                                                                          |
+| 15  | Languages                                   | English only                                                                                                                                                                                   | §18 Phase 2b: Hindi labels on the prescription print sheet only if asked                                                                                                               |
+| 16  | CAPTCHA                                     | ALTCHA                                                                                                                                                                                         | §18 Phase 4                                                                                                                                                                            |
+| 17  | Gateway and 80G                             | Parked; organisation to be asked                                                                                                                                                               | §18 Phase 7 marked parked                                                                                                                                                              |
+| 18  | AI screening                                | To be asked whether it is in scope                                                                                                                                                             | schema ready (§8.5.5); job disabled                                                                                                                                                    |
+| 19  | SMTP account                                | A Gmail address will be provided                                                                                                                                                               | §5; app password to be created by the account owner                                                                                                                                    |
+| 20  | Alert channel                               | Slack                                                                                                                                                                                          | §14.2                                                                                                                                                                                  |
+| 21  | Volume                                      | About 100 patients per camp day                                                                                                                                                                | §12.4 basis                                                                                                                                                                            |
+| 22  | Photo views                                 | Dentist will confirm; not a hard cap, depends on the case                                                                                                                                      | §8.5.5: at least one image, no maximum, views are guidance                                                                                                                             |
+| 23  | AI screening                                | **In scope**                                                                                                                                                                                   | D25, §8.5.10, §18 Phase 5, `ai-inference` container                                                                                                                                    |
+| 24  | Camp date and 80G                           | Must not affect development                                                                                                                                                                    | Phase 5 (AI) no longer waits on a live camp date; donations remain Phase 7 and parked                                                                                                  |
+| 25  | Development style                           | Module-wise so nothing tangles; no low-quality generated code; documentation maintained for hand-over; internal and external APIs versioned                                                    | D26, §23                                                                                                                                                                               |
+| 26  | Product scope (message received 2026-09-29) | A dental EMR built for camps, linked to the clinic: dental screening and treatment camps, clinic operations, oral cancer and tobacco cessation services                                        | §1, §8.5.9 programmes, D27 clinic operations scope, §18 Phase 3                                                                                                                        |
+| 27  | Who counsels; camp flow                     | The dentist counsels. The volunteer registers the patient, takes vitals, records the complaint and habits, and drafts a structured summary for the dentist                                     | §8.5.8 flow confirmed; `counsellor` is a role the dentist holds by default (a trained volunteer can be given it later); the registration steps in Phase 2 are the "structured summary" |
+| 28  | Oral cancer pathway partners                | Any partner facility, depending on future partnerships; no one-to-one hospital integration                                                                                                     | §8.5.9: `external_facility_name` free text on referrals; biopsy result recorded manually when known; no interface to any hospital system                                               |
+| 29  | AI                                          | Later in development; not excluded; assists the dentist, never decides                                                                                                                         | D25 unchanged; Phase 5 stays after the HMIS phases                                                                                                                                     |
+| 30  | Clinic operations                           | D27 reading confirmed                                                                                                                                                                          | no change                                                                                                                                                                              |
+| 31  | Secrets and webhook URLs                    | The developer fills them into the env file; the plan must produce `.env.example` listing every variable                                                                                        | Phase 0 deliverable (§23.5 item 9); `config.ts` refuses to boot without them                                                                                                           |
+| 32  | Truthfulness of the built system            | Past experience: an assistant described a Redis cache flow that did not exist in the code. Nothing in this platform may be described as doing something the code does not do                   | §23.6 (new), and the working agreement in §23.7                                                                                                                                        |
+| 33  | AI-assisted development set-up              | Fable orchestrates and decides with the product owner; Opus subagents for development; Sonnet subagents for read-only work; to be written into `CLAUDE.md` when that file is created (not yet) | §23.7                                                                                                                                                                                  |
 
 ### 20.2 Still open
 
@@ -1439,33 +1443,33 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 
 ## 21. Glossary
 
-| Term | Meaning |
-| --- | --- |
-| Camp | A one-day (usually) field event where volunteers register and screen patients |
-| Encounter | One clinical interaction with a patient at a camp or clinic; carries histories, vitals, the screening, the dentist review, treatments, prescriptions |
-| Oral screening | The volunteer-captured checklist and photographs for a camp encounter; the input to the dentist review |
-| Screening result | A preliminary read of a screening from a source (volunteer checklist, AI model, dentist preliminary); never authoritative on its own |
-| Dentist review | The clinician's findings, diagnosis, risk level and decision for an encounter; the only authoritative clinical record |
-| FDI notation | Two-digit tooth numbering (11–48) used on the tooth chart |
-| Referral | A request that a patient seen at a camp be treated at a Saathi or partner clinic; has its own lifecycle and structured reasons |
-| Clinic continuity | The clinic encounter is linked to the referral and previous encounter so camp images, review and history are visible without re-entry |
-| Outcome | The recorded end state of a care episode |
-| Follow-up | A scheduled future action (visit, call, review) with a due date and reminder |
-| OPMD | Oral potentially malignant disorder (leukoplakia, erythroplakia, oral submucous fibrosis, and similar); the target of oral cancer screening |
-| Oral lesion assessment | The dentist's structured record of a suspicious soft-tissue finding, its risk, action and surveillance |
-| Cessation enrolment / session | A patient's participation in the tobacco cessation programme and each counselling contact within it |
-| AI screening result | A preliminary, model-produced read of a screening's images; assistive only (D25) |
-| Model manifest | The recorded name, version, training-set hash, validation metrics and thresholds of a deployed AI model |
-| Consent | A per-type, per-grant record (treatment, data, photography, contact channels, research) that gates communications and image use |
-| Tier (T0–T3) | Privacy classification of a field or bucket, §8.9 |
-| Dedup | Detecting that a registration matches an existing patient |
-| CMS | The admin tools that edit public site content stored in Postgres |
-| RSC | React Server Components; pages rendered on the server in Next.js |
-| Route handler | A Next.js `route.ts` file implementing an HTTP endpoint |
-| pg-boss | Postgres-backed job queue library |
-| Keyset pagination | Paging by "after this row" instead of by offset; stays fast on deep pages |
-| RPO / RTO | Maximum acceptable data loss / maximum acceptable downtime after a disaster |
-| ADR | Architecture Decision Record; a short note of a decision and its reasons in `docs/adr/` |
+| Term                          | Meaning                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Camp                          | A one-day (usually) field event where volunteers register and screen patients                                                                        |
+| Encounter                     | One clinical interaction with a patient at a camp or clinic; carries histories, vitals, the screening, the dentist review, treatments, prescriptions |
+| Oral screening                | The volunteer-captured checklist and photographs for a camp encounter; the input to the dentist review                                               |
+| Screening result              | A preliminary read of a screening from a source (volunteer checklist, AI model, dentist preliminary); never authoritative on its own                 |
+| Dentist review                | The clinician's findings, diagnosis, risk level and decision for an encounter; the only authoritative clinical record                                |
+| FDI notation                  | Two-digit tooth numbering (11–48) used on the tooth chart                                                                                            |
+| Referral                      | A request that a patient seen at a camp be treated at a Saathi or partner clinic; has its own lifecycle and structured reasons                       |
+| Clinic continuity             | The clinic encounter is linked to the referral and previous encounter so camp images, review and history are visible without re-entry                |
+| Outcome                       | The recorded end state of a care episode                                                                                                             |
+| Follow-up                     | A scheduled future action (visit, call, review) with a due date and reminder                                                                         |
+| OPMD                          | Oral potentially malignant disorder (leukoplakia, erythroplakia, oral submucous fibrosis, and similar); the target of oral cancer screening          |
+| Oral lesion assessment        | The dentist's structured record of a suspicious soft-tissue finding, its risk, action and surveillance                                               |
+| Cessation enrolment / session | A patient's participation in the tobacco cessation programme and each counselling contact within it                                                  |
+| AI screening result           | A preliminary, model-produced read of a screening's images; assistive only (D25)                                                                     |
+| Model manifest                | The recorded name, version, training-set hash, validation metrics and thresholds of a deployed AI model                                              |
+| Consent                       | A per-type, per-grant record (treatment, data, photography, contact channels, research) that gates communications and image use                      |
+| Tier (T0–T3)                  | Privacy classification of a field or bucket, §8.9                                                                                                    |
+| Dedup                         | Detecting that a registration matches an existing patient                                                                                            |
+| CMS                           | The admin tools that edit public site content stored in Postgres                                                                                     |
+| RSC                           | React Server Components; pages rendered on the server in Next.js                                                                                     |
+| Route handler                 | A Next.js `route.ts` file implementing an HTTP endpoint                                                                                              |
+| pg-boss                       | Postgres-backed job queue library                                                                                                                    |
+| Keyset pagination             | Paging by "after this row" instead of by offset; stays fast on deep pages                                                                            |
+| RPO / RTO                     | Maximum acceptable data loss / maximum acceptable downtime after a disaster                                                                          |
+| ADR                           | Architecture Decision Record; a short note of a decision and its reasons in `docs/adr/`                                                              |
 
 ---
 
@@ -1477,26 +1481,26 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 
 ### 22.1 Consensus (all three agreed) and applied
 
-| Item | Revision 1 | Revision 2 | Where |
-| --- | --- | --- | --- |
-| Log aggregation | Loki + Promtail from day one | rotated JSON logs, `docker logs` + `jq`; Loki at a threshold | D19, §14.1, §19 |
+| Item                   | Revision 1                                                  | Revision 2                                                                                           | Where             |
+| ---------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------- |
+| Log aggregation        | Loki + Promtail from day one                                | rotated JSON logs, `docker logs` + `jq`; Loki at a threshold                                         | D19, §14.1, §19   |
 | Metrics and dashboards | Prometheus, 3 exporters, Grafana, 5 dashboards from day one | `check.sh` on host cron every 5 min raising the same alerts; Grafana profile in repo, off by default | D19, §14.2, §14.6 |
-| Error tracking | GlitchTip | none; request ids and logs | §5 |
-| Uptime monitoring | Uptime Kuma on the VPS | Uptime Kuma on the backup host, with a dead-man heartbeat | §14.3 |
-| File storage | MinIO + presigned uploads + variants job | local encrypted volume behind a `StorageAdapter`; uploads through the app; MinIO/S3 at a threshold | D20, §8.3 |
-| Background jobs | separate worker container | pg-boss in-process, `worker.ts` kept for the split | D21, §13.2 |
-| Integration tests | Testcontainers + MinIO | GitHub Actions Postgres service | §17 |
-| End-to-end tests | full Playwright on every PR | 4 smoke flows on push, full suite nightly | §16.2, §17 |
-| Load testing | k6 gates per phase | a 10-tablet Node script before each pilot | §17 |
-| API documentation | OpenAPI generation, CI diff, `/admin/docs`, Postman export | zod schemas + §9.2; deferred until an external consumer exists | §9.6 |
-| Staging | always-on beside prod, fed by an anonymised production dump | on demand, synthetic seed only; the anonymiser was cut as a PHI risk in itself | §15.4 |
-| Report snapshots | nightly pre-aggregation from Phase 5 | live SQL; snapshots at a threshold | §12.3, §19 |
-| Audit log partitioning | scheduled for Phase 6 at 200 k rows | only at the §19 threshold (5 M rows); the Phase 6 item contradicted §19 | §19 |
-| Git ceremony | PR-only, release tooling, weekly Dependabot | trunk-based, PRs for risky changes, monthly grouped Dependabot | §16.1, §16.4 |
-| Coverage target | 80 % on `src/server` | none; test-first required for state machines, permissions, money, consent | §17 |
-| Runbooks | eight | four that will actually be maintained | §18 Phase 6 |
-| Restore test | GitHub Actions job | on the backup host (no PHI or keys on GitHub runners) | §15.5 |
-| Phase order | website and CMS first, HMIS third, hardening last | backups, alerting and privacy in Phase 0–1; HMIS pilot in Phase 2; website in Phase 4 | §18 |
+| Error tracking         | GlitchTip                                                   | none; request ids and logs                                                                           | §5                |
+| Uptime monitoring      | Uptime Kuma on the VPS                                      | Uptime Kuma on the backup host, with a dead-man heartbeat                                            | §14.3             |
+| File storage           | MinIO + presigned uploads + variants job                    | local encrypted volume behind a `StorageAdapter`; uploads through the app; MinIO/S3 at a threshold   | D20, §8.3         |
+| Background jobs        | separate worker container                                   | pg-boss in-process, `worker.ts` kept for the split                                                   | D21, §13.2        |
+| Integration tests      | Testcontainers + MinIO                                      | GitHub Actions Postgres service                                                                      | §17               |
+| End-to-end tests       | full Playwright on every PR                                 | 4 smoke flows on push, full suite nightly                                                            | §16.2, §17        |
+| Load testing           | k6 gates per phase                                          | a 10-tablet Node script before each pilot                                                            | §17               |
+| API documentation      | OpenAPI generation, CI diff, `/admin/docs`, Postman export  | zod schemas + §9.2; deferred until an external consumer exists                                       | §9.6              |
+| Staging                | always-on beside prod, fed by an anonymised production dump | on demand, synthetic seed only; the anonymiser was cut as a PHI risk in itself                       | §15.4             |
+| Report snapshots       | nightly pre-aggregation from Phase 5                        | live SQL; snapshots at a threshold                                                                   | §12.3, §19        |
+| Audit log partitioning | scheduled for Phase 6 at 200 k rows                         | only at the §19 threshold (5 M rows); the Phase 6 item contradicted §19                              | §19               |
+| Git ceremony           | PR-only, release tooling, weekly Dependabot                 | trunk-based, PRs for risky changes, monthly grouped Dependabot                                       | §16.1, §16.4      |
+| Coverage target        | 80 % on `src/server`                                        | none; test-first required for state machines, permissions, money, consent                            | §17               |
+| Runbooks               | eight                                                       | four that will actually be maintained                                                                | §18 Phase 6       |
+| Restore test           | GitHub Actions job                                          | on the backup host (no PHI or keys on GitHub runners)                                                | §15.5             |
+| Phase order            | website and CMS first, HMIS third, hardening last           | backups, alerting and privacy in Phase 0–1; HMIS pilot in Phase 2; website in Phase 4                | §18               |
 
 ### 22.2 Under-engineering the council found, now fixed
 
@@ -1515,18 +1519,18 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 
 ### 22.3 Splits decided by the chair
 
-| Item | Votes | Decision | Reasoning |
-| --- | --- | --- | --- |
-| Custom auth vs library | 2 for a library, 1 for custom | **Library** (Better Auth) | The two "for" reviewers made the risk argument the plan itself makes about PHI and money; the "300 lines" estimate was optimistic once invites, reset, lockout and recovery codes are included. RBAC stays custom. (D18) |
-| Separate `migrate` container | 1 keep, 2 fold into app start | **Keep** | It is one compose entry with zero runtime memory, and it keeps the schema-owner credentials out of the app container, which the fold-in would lose. |
-| Server Actions alongside route handlers (D6) | 1 allow, 2 silent | **Keep D6** for v1 | One mutation surface is simpler to audit and to test with Postman; the boilerplate cost is real and is mitigated by the handler wrapper. Revisit if admin forms become a grind. |
-| TOTP MFA in v1 | 2 keep, 1 defer | **Keep** | Health data and money; the library makes it cheap. |
-| Cloudflare proxy | 2 keep, 1 defer | **Keep** | Free and reversible; the product owner later confirmed it on (§20.1). |
-| Keyset pagination everywhere | 2 keep, 1 scope it | **Scope it** | Keyset on unbounded tables, page numbers on small admin lists; staff want page numbers. (§12.2) |
-| Optimistic concurrency | 3 scope it | **Scoped** | CMS sections, encounters, dentist reviews only. |
-| ESLint module boundaries | 1 keep, 1 simplify, 1 defer | **One rule** | Cheap, and it is the only thing that stops a solo developer's architecture from eroding. |
-| HaveIBeenPwned check | 1 keep | **Parked** | The reviewer's product owner had already parked it as an external dependency in the credential path; a bundled common-password list replaces it. |
-| Nightly `VACUUM`, `explain.ts`, N+1 counter | 1 cut | **Cut the first two, keep a 5-endpoint query-count test** | Autovacuum handles these volumes; the query-count test is cheap insurance on the heaviest screens. |
+| Item                                         | Votes                         | Decision                                                  | Reasoning                                                                                                                                                                                                                |
+| -------------------------------------------- | ----------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Custom auth vs library                       | 2 for a library, 1 for custom | **Library** (Better Auth)                                 | The two "for" reviewers made the risk argument the plan itself makes about PHI and money; the "300 lines" estimate was optimistic once invites, reset, lockout and recovery codes are included. RBAC stays custom. (D18) |
+| Separate `migrate` container                 | 1 keep, 2 fold into app start | **Keep**                                                  | It is one compose entry with zero runtime memory, and it keeps the schema-owner credentials out of the app container, which the fold-in would lose.                                                                      |
+| Server Actions alongside route handlers (D6) | 1 allow, 2 silent             | **Keep D6** for v1                                        | One mutation surface is simpler to audit and to test with Postman; the boilerplate cost is real and is mitigated by the handler wrapper. Revisit if admin forms become a grind.                                          |
+| TOTP MFA in v1                               | 2 keep, 1 defer               | **Keep**                                                  | Health data and money; the library makes it cheap.                                                                                                                                                                       |
+| Cloudflare proxy                             | 2 keep, 1 defer               | **Keep**                                                  | Free and reversible; the product owner later confirmed it on (§20.1).                                                                                                                                                    |
+| Keyset pagination everywhere                 | 2 keep, 1 scope it            | **Scope it**                                              | Keyset on unbounded tables, page numbers on small admin lists; staff want page numbers. (§12.2)                                                                                                                          |
+| Optimistic concurrency                       | 3 scope it                    | **Scoped**                                                | CMS sections, encounters, dentist reviews only.                                                                                                                                                                          |
+| ESLint module boundaries                     | 1 keep, 1 simplify, 1 defer   | **One rule**                                              | Cheap, and it is the only thing that stops a solo developer's architecture from eroding.                                                                                                                                 |
+| HaveIBeenPwned check                         | 1 keep                        | **Parked**                                                | The reviewer's product owner had already parked it as an external dependency in the credential path; a bundled common-password list replaces it.                                                                         |
+| Nightly `VACUUM`, `explain.ts`, N+1 counter  | 1 cut                         | **Cut the first two, keep a 5-endpoint query-count test** | Autovacuum handles these volumes; the query-count test is cheap insurance on the heaviest screens.                                                                                                                       |
 
 ### 22.4 What the council did not review
 
@@ -1548,15 +1552,15 @@ This section exists because the organisation has no technical staff and the plat
 
 ### 23.2 Versioning policy: external and internal interfaces
 
-| Interface | Versioned how | Breaking change means | Deprecation |
-| --- | --- | --- | --- |
-| Public HTTP API `/api/v1/*` | path version | removing or renaming a field or endpoint, changing a type or a status code, tightening validation on existing input | `/api/v2` is added, `/api/v1` keeps working for at least 6 months with a `Deprecation` header and a `Sunset` date; removal is a release note |
-| Webhook endpoints | path version (`/api/v1/webhooks/<provider>`) | any change the provider's contract cannot absorb | new path, old path kept until the provider is reconfigured |
-| Internal inference API `ai-inference:/v1/analyse` | path version + `model_manifest.version` in every response | request or response shape change | new path; the application pins the version it calls in `config.ts` |
-| Module service functions | TypeScript signatures are the contract; exported types carry a `@since` tag; removed functions go through `@deprecated` for one release | changing a parameter or return type that another module uses | one release of `@deprecated` with the replacement named |
-| Database schema | sequential SQL migrations; expand/contract for anything a running release depends on | dropping or renaming a column or table in use | never in the same release that stops using it |
-| Job payloads | `version` field on every job payload; handlers accept the current and previous version | shape change | handler keeps reading the previous version for one release |
-| CMS section `data` | `history_schema_version`-style `schema_version` on every JSONB document (§8.2, §8.5.4) | changing a field's meaning or removing one | reader upgrades old documents on read; a migration script rewrites stored documents when a version is retired |
+| Interface                                         | Versioned how                                                                                                                           | Breaking change means                                                                                               | Deprecation                                                                                                                                  |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public HTTP API `/api/v1/*`                       | path version                                                                                                                            | removing or renaming a field or endpoint, changing a type or a status code, tightening validation on existing input | `/api/v2` is added, `/api/v1` keeps working for at least 6 months with a `Deprecation` header and a `Sunset` date; removal is a release note |
+| Webhook endpoints                                 | path version (`/api/v1/webhooks/<provider>`)                                                                                            | any change the provider's contract cannot absorb                                                                    | new path, old path kept until the provider is reconfigured                                                                                   |
+| Internal inference API `ai-inference:/v1/analyse` | path version + `model_manifest.version` in every response                                                                               | request or response shape change                                                                                    | new path; the application pins the version it calls in `config.ts`                                                                           |
+| Module service functions                          | TypeScript signatures are the contract; exported types carry a `@since` tag; removed functions go through `@deprecated` for one release | changing a parameter or return type that another module uses                                                        | one release of `@deprecated` with the replacement named                                                                                      |
+| Database schema                                   | sequential SQL migrations; expand/contract for anything a running release depends on                                                    | dropping or renaming a column or table in use                                                                       | never in the same release that stops using it                                                                                                |
+| Job payloads                                      | `version` field on every job payload; handlers accept the current and previous version                                                  | shape change                                                                                                        | handler keeps reading the previous version for one release                                                                                   |
+| CMS section `data`                                | `history_schema_version`-style `schema_version` on every JSONB document (§8.2, §8.5.4)                                                  | changing a field's meaning or removing one                                                                          | reader upgrades old documents on read; a migration script rewrites stored documents when a version is retired                                |
 
 Every change to any of these is recorded in `docs/api/CHANGELOG.md` (external) or `docs/internal-changelog.md` (internal), under the release tag, with the migration note a future developer would need.
 
@@ -1566,7 +1570,7 @@ Every change to any of these is recorded in `docs/api/CHANGELOG.md` (external) o
 - Files stay small and single-purpose: a service file over about 400 lines is split by sub-domain (for example `encounters/review.service.ts`).
 - Names say what things are in the domain's own words (`referral`, `oralLesionAssessment`), never generic (`data`, `item`, `manager`, `helper`).
 - No dead code, no commented-out code, no TODOs without an issue link, no speculative abstractions ("we might need this later"), no copy-pasted blocks where a function would do, no generated boilerplate left unread.
-- Comments explain *why* a non-obvious thing is done, never *what* the code does. Clinical and financial rules cite the section of this plan they implement.
+- Comments explain _why_ a non-obvious thing is done, never _what_ the code does. Clinical and financial rules cite the section of this plan they implement.
 - Errors follow §9.7; no silent catches. Logging follows §14.1; no PHI.
 - Every rule above applies equally to code written with an AI assistant. Such code is read line by line by the developer, simplified where it over-explains or over-abstracts, and tested like any other; "the tool wrote it" is never a reason for a line to exist.
 - Formatting and lint are automated (Prettier, ESLint with the boundary rule); a formatting diff never appears in a review.

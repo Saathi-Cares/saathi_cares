@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - **No commits by the implementer.** The repository owner commits when they ask. Tasks end with "report with evidence".
-- **Claims match code (PLAN.md §23.6).** Every service in `compose.yaml` has a consumer and a check in this plan; the `observability` profile is *not* created in this phase (it would be a dormant component; it is added at the §19 trigger, PLAN.md §14.6).
+- **Claims match code (PLAN.md §23.6).** Every service in `compose.yaml` has a consumer and a check in this plan; the `observability` profile is _not_ created in this phase (it would be a dormant component; it is added at the §19 trigger, PLAN.md §14.6).
 - Only `nginx` publishes ports. Every container has `mem_limit`, `restart: unless-stopped`, `security_opt: [no-new-privileges:true]`, and the app runs as non-root with a read-only root filesystem.
 - The app container connects as `saathi_app`; only the `migrate` one-shot uses `saathi_owner`. `saathi_app` gets `CREATE` on the database solely for pg-boss's own schema (documented in 0A's `src/server/README.md`).
 - Secrets: `.env.prod`/`.env.staging` on the host, mode 600, owned by the deploy user; GitHub Actions secrets for CI; `.env.example` in the repo is the complete list.
@@ -36,10 +36,12 @@
 ### Task 1: Container image for the application
 
 **Files:**
+
 - Create: `Dockerfile`, `.dockerignore`
 - Modify: `package.json` (add `postbuild` hook)
 
 **Interfaces:**
+
 - Produces: image `saathi-cares/app` with entry points `node server.js` (web) and `node dist/migrate.js` (migrations), listening on 3000, user `nextjs` (uid 1001), `MIGRATIONS_DIR=/app/dist/migrations`.
 
 - [ ] **Step 1: Make the build produce the migration bundle and copy the SQL files**
@@ -134,10 +136,12 @@ On Windows Docker Desktop `--network host` is unavailable; use `--add-host=host.
 ### Task 2: Compose stack, database roles, environments
 
 **Files:**
+
 - Create: `infra/compose.yaml`, `infra/compose.dev.yaml`, `infra/compose.staging.yaml`, `infra/postgres/init.sql`, `infra/postgres/postgresql.conf`, `infra/.env.compose.example`
 - Modify: `README.md` (run instructions), `.env.example` (compose section)
 
 **Interfaces:**
+
 - Produces: `docker compose -f infra/compose.yaml --env-file /srv/saathi/.env.prod up -d` brings up `postgres → migrate → app → nginx` and `backup`; `docker compose -f infra/compose.yaml -f infra/compose.dev.yaml --profile dev up` gives a developer Postgres + Mailpit only.
 - Compose variables (from the env file): `IMAGE_TAG`, `POSTGRES_PASSWORD`, `SAATHI_OWNER_PASSWORD`, `SAATHI_APP_PASSWORD`, `APP_URL`, `MEDIA_SIGNING_SECRET`, `RESTIC_PASSWORD`, `SLACK_WEBHOOK_URL`, `DATA_ROOT` (default `/srv/saathi`).
 
@@ -193,28 +197,28 @@ name: saathi
 
 x-common: &common
   restart: unless-stopped
-  security_opt: ["no-new-privileges:true"]
+  security_opt: ['no-new-privileges:true']
   logging:
     driver: json-file
-    options: { max-size: "50m", max-file: "10" }
+    options: { max-size: '50m', max-file: '10' }
 
 services:
   postgres:
     <<: *common
     image: postgres:16-alpine
-    profiles: ["core", "dev"]
+    profiles: ['core', 'dev']
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SAATHI_OWNER_PASSWORD: ${SAATHI_OWNER_PASSWORD}
       SAATHI_APP_PASSWORD: ${SAATHI_APP_PASSWORD}
-    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    command: ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf']
     volumes:
       - ${DATA_ROOT:-/srv/saathi}/pgdata:/var/lib/postgresql/data
       - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
     mem_limit: 1536m
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d saathi"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d saathi']
       interval: 10s
       timeout: 5s
       retries: 12
@@ -222,10 +226,10 @@ services:
 
   migrate:
     image: ghcr.io/saathi-cares/app:${IMAGE_TAG:-latest}
-    profiles: ["core"]
-    restart: "no"
-    security_opt: ["no-new-privileges:true"]
-    command: ["node", "dist/migrate.js"]
+    profiles: ['core']
+    restart: 'no'
+    security_opt: ['no-new-privileges:true']
+    command: ['node', 'dist/migrate.js']
     environment:
       DATABASE_URL_MIGRATIONS: postgres://saathi_owner:${SAATHI_OWNER_PASSWORD}@postgres:5432/saathi
     depends_on:
@@ -236,7 +240,7 @@ services:
   app:
     <<: *common
     image: ghcr.io/saathi-cares/app:${IMAGE_TAG:-latest}
-    profiles: ["core"]
+    profiles: ['core']
     environment:
       NODE_ENV: production
       APP_URL: ${APP_URL}
@@ -244,18 +248,18 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MEDIA_ROOT: /data/media
       MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET}
-      JOBS_ENABLED: "true"
-      JOBS_CONCURRENCY: "2"
+      JOBS_ENABLED: 'true'
+      JOBS_CONCURRENCY: '2'
     volumes:
       - ${DATA_ROOT:-/srv/saathi}/media:/data/media
     read_only: true
-    tmpfs: ["/tmp", "/app/.next/cache"]
+    tmpfs: ['/tmp', '/app/.next/cache']
     depends_on:
       migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
     mem_limit: 768m
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health/ready"]
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/health/ready']
       interval: 30s
       timeout: 5s
       start_period: 30s
@@ -265,8 +269,8 @@ services:
   nginx:
     <<: *common
     image: nginx:1.27-alpine
-    profiles: ["core"]
-    ports: ["80:80", "443:443"]
+    profiles: ['core']
+    ports: ['80:80', '443:443']
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -277,7 +281,7 @@ services:
       app: { condition: service_healthy }
     mem_limit: 64m
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-health"]
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/nginx-health']
       interval: 30s
       timeout: 3s
       retries: 3
@@ -287,7 +291,7 @@ services:
     <<: *common
     build: ./backup
     image: saathi-cares/backup:local
-    profiles: ["core"]
+    profiles: ['core']
     environment:
       PGHOST: postgres
       PGUSER: postgres
@@ -318,7 +322,7 @@ networks:
 ```yaml
 services:
   postgres:
-    ports: ["5432:5432"]
+    ports: ['5432:5432']
     # `!override` replaces the base list instead of appending to it (Compose ≥ 2.24); appending would mount
     # two volumes on /var/lib/postgresql/data and fail.
     volumes: !override
@@ -328,8 +332,8 @@ services:
       - ./postgres/init-test-db.sql:/docker-entrypoint-initdb.d/20-test.sql:ro
   mailpit:
     image: axllent/mailpit:latest
-    profiles: ["dev"]
-    ports: ["8025:8025", "1025:1025"]
+    profiles: ['dev']
+    ports: ['8025:8025', '1025:1025']
     mem_limit: 64m
 volumes:
   saathi-dev-pgdata: {}
@@ -353,9 +357,9 @@ services:
       LOG_LEVEL: debug
     networks: [internal, edge]
   nginx:
-    profiles: ["never"]
+    profiles: ['never']
   backup:
-    profiles: ["never"]
+    profiles: ['never']
 networks:
   edge:
     name: saathi_edge
@@ -396,9 +400,11 @@ Expected: `docker compose ps` shows `migrate` exited 0, `app` healthy. Then `doc
 ### Task 3: Nginx perimeter
 
 **Files:**
+
 - Create: `infra/nginx/nginx.conf`, `infra/nginx/conf.d/app.conf`, `infra/nginx/conf.d/staging.conf`, `infra/nginx/snippets/security-headers.conf`, `infra/nginx/snippets/rate-limits.conf`, `infra/nginx/snippets/cloudflare-real-ip.conf`, `infra/nginx/snippets/proxy.conf`, `infra/nginx/README.md`, `scripts/dev-cert.sh`
 
 **Interfaces:**
+
 - Produces: HTTPS on 443 for `${DOMAIN}` and `staging.${DOMAIN}`, HTTP→HTTPS redirect, `/media/public/*` from disk, everything else proxied to `app:3000`; `/nginx-health` for the container health check; rate-limit zones `login`, `public_forms`, `api` referenced by later phases.
 
 - [ ] **Step 1: `nginx.conf`**
@@ -618,9 +624,11 @@ The `CF-Connecting-IP` header is only honoured from Cloudflare's ranges; for thi
 ### Task 4: Backups: container, restore test, developer-machine mirror
 
 **Files:**
+
 - Create: `infra/backup/Dockerfile`, `infra/backup/backup.sh`, `infra/backup/restore-test.sh`, `infra/backup/notify.sh`, `infra/backup/crontab`, `infra/backup/entrypoint.sh`, `scripts/mirror-backup.ps1`, `scripts/mirror-backup.sh`, `docs/runbooks/disaster-recovery.md` (Task 7 completes it)
 
 **Interfaces:**
+
 - Produces: restic repository at `${DATA_ROOT}/backups/restic` with snapshots tagged `db` and `media` every 6 h; `restore-test.sh` exit 0 only when a fresh dump restores with row counts; `mirror-backup.ps1` copies the repository to `%USERPROFILE%\saathi-backups\restic`; state files `${DATA_ROOT}/backups/state/last-backup-ok`, `last-restore-test-ok`, `last-mirror-ok` (epoch seconds) read by `check.sh` (Task 5).
 
 - [ ] **Step 1: Backup image and entrypoint**
@@ -805,9 +813,11 @@ Mirror test: from PowerShell on the developer machine against the local compose 
 ### Task 5: Host health checks and Slack alerts
 
 **Files:**
+
 - Create: `infra/checks/check.sh`, `infra/checks/logq.sh`, `infra/checks/monthly-report.sh`, `infra/checks/crontab`, `infra/checks/README.md`, `infra/checks/check.test.sh`
 
 **Interfaces:**
+
 - Produces: `check.sh` run every 5 min by host cron; reads `/srv/saathi/.env.prod` for `SLACK_WEBHOOK_URL` and `UPTIME_HEARTBEAT_URL`; keeps state in `/srv/saathi/checks/state/<check>`; alerts once on failure and once on recovery; pings the heartbeat URL when every check passes.
 
 - [ ] **Step 1: `check.sh`**
@@ -1006,9 +1016,11 @@ One page: what each check measures, thresholds (copied from PLAN.md §14.4), whe
 ### Task 6: GitHub Actions: CI, nightly, deploy, rollback
 
 **Files:**
+
 - Create: `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`, `.github/workflows/deploy.yml`, `.github/dependabot.yml`, `scripts/rollback.sh`, `scripts/deploy-remote.sh`, `.github/pull_request_template.md`
 
 **Interfaces:**
+
 - Produces: image `ghcr.io/saathi-cares/app:<sha>` and `:<tag>`; remote script `deploy-remote.sh <project> <image-tag>` on the VPS; GitHub environments `staging` and `production` (production requires a reviewer approval); secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT` (read-only pull token for the VPS).
 
 - [ ] **Step 1: `ci.yml`**
@@ -1061,7 +1073,7 @@ Install gitleaks via `curl` of the release tarball in a preceding step if `npx g
 ```yaml
 name: nightly
 on:
-  schedule: [{ cron: "30 21 * * *" }]   # 03:00 IST
+  schedule: [{ cron: '30 21 * * *' }] # 03:00 IST
   workflow_dispatch:
 jobs:
   full:
@@ -1071,14 +1083,14 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: saathi_test }
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/saathi_test
       APP_URL: http://localhost:3000
       MEDIA_ROOT: ./.test-media
       MEDIA_SIGNING_SECRET: 0123456789abcdef0123456789abcdef
-      JOBS_ENABLED: "true"
+      JOBS_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -1090,7 +1102,7 @@ jobs:
       - run: npm audit --audit-level=high
       - run: docker build -t app:nightly .
       - uses: aquasecurity/trivy-action@0.28.0
-        with: { image-ref: app:nightly, severity: "HIGH,CRITICAL", exit-code: "0", format: table }
+        with: { image-ref: app:nightly, severity: 'HIGH,CRITICAL', exit-code: '0', format: table }
       - uses: actions/dependency-review-action@v4
         if: github.event_name == 'pull_request'
 ```
@@ -1214,7 +1226,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: monthly }
-    groups: { all: { patterns: ["*"] } }
+    groups: { all: { patterns: ['*'] } }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
@@ -1236,6 +1248,7 @@ CI cannot be verified without pushing. The repository owner pushes when ready (m
 ### Task 7: Runbooks and the hosted uptime monitor
 
 **Files:**
+
 - Create: `docs/runbooks/host-setup.md`, `docs/runbooks/deploy-and-rollback.md`, `docs/runbooks/disaster-recovery.md`, `docs/runbooks/breach-response.md`, `docs/runbooks/key-envelope.md`
 - Modify: `README.md` (dormant components stays "None"; add the operations section)
 
@@ -1282,6 +1295,7 @@ Append to `README.md`:
 ### Task 8: Execute on the VPS and close Phase 0
 
 **Files:**
+
 - Create: `docs/adr/0001-phase-0-exit.md`
 - Modify: `PLAN.md` §5 (Node 24 line) if not already done in 0A
 

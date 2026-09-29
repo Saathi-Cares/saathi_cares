@@ -19,9 +19,16 @@ export function Programs() {
   return (
     <section id="programs" className="section-padding bg-secondary" ref={ref}>
       <div className="container-wide mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={isInView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6 }} className="text-center mb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-16"
+        >
           <span className="text-sm font-medium text-primary uppercase tracking-wider">{cms.badge}</span>
-          <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-6">{cms.title}</h2>
+          <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-6">
+            {cms.title}
+          </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{cms.description}</p>
         </motion.div>
 
@@ -31,11 +38,17 @@ export function Programs() {
             const styles = colorStyles[color];
             const Icon = iconMap[program.icon] || Heart;
             return (
-              <motion.div key={program.id} initial={{ opacity: 0, y: 20 }} animate={isInView ? { opacity: 1, y: 0 } : {}}
+              <motion.div
+                key={program.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 0.1 * index }}
-                className={`${styles.bg} rounded-xl p-8 group hover:shadow-elevated transition-all duration-300`}>
+                className={`${styles.bg} rounded-xl p-8 group hover:shadow-elevated transition-all duration-300`}
+              >
                 <div className="flex items-start gap-5">
-                  <div className={`w-14 h-14 rounded-xl ${styles.iconBg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300`}>
+                  <div
+                    className={`w-14 h-14 rounded-xl ${styles.iconBg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300`}
+                  >
                     <Icon className={`w-7 h-7 ${styles.iconColor}`} />
                   </div>
                   <div>
@@ -45,7 +58,8 @@ export function Programs() {
                       <ul className="space-y-1">
                         {program.outcomes.map((o, i) => (
                           <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-primary rounded-full" />{o}
+                            <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                            {o}
                           </li>
                         ))}
                       </ul>

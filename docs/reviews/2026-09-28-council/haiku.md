@@ -6,38 +6,39 @@ The plan is well-designed but assumes resources that don't match reality: one so
 
 ## Verdict Table: Components and Practices
 
-| Component | Verdict | One-line reason | Cost of keeping |
-|---|---|---|---|
-| Loki + Promtail | DEFER-Phase-6 | 256 MB RAM for logs; start with pino to file, grep in emergencies | 256 MB + 2 h |
-| Prometheus + exporters | DEFER-Phase-6 | Full metrics stack not needed for v1; basic `/health` endpoint sufficient | 512 MB + 4 h |
-| Grafana + dashboards | DEFER-Phase-6 | Not needed until Phase 6; manual SQL queries + Uptime Kuma suffice | 256 MB + 3 h |
-| GlitchTip | CUT | Loki provides error tracking; adds cost for zero v1 benefit | 2 h + 128 MB |
-| MinIO | SIMPLIFY | 500 media files fit on local disk; migrate at §19 (volume scales) | 256 MB + local disk free |
-| pg-boss + separate worker | SIMPLIFY | Run in-process Phase 0–2; split at §19 (>1000 jobs/min) | 256 MB + orch overhead |
-| Separate migrate container | SIMPLIFY | Run migrations in app startup Phase 0–1; separate only multi-instance | negligible |
-| TOTP MFA | DEFER-Phase-2 | Password-only login Phase 1; add MFA after workflows proven | 3 days dev in Phase 2 |
-| Argon2 memory=64 MiB | SIMPLIFY | Use 16 MiB for v1; still Argon2id, secure for staff directory | 1 h tuning |
-| Separate DB roles | SIMPLIFY | Single app role Phase 0–4; add readonly at Phase 6 | negligible |
-| Read-only container FS | DEFER-Phase-6 | Nice-to-have security; skip v1 to reduce Dockerfile complexity | 1 day work |
-| Cloudflare proxy | DEFER-Phase-6 | Plain DNS + certbot; add Cloudflare at Phase 6 if needed | optional, free |
-| Keyset pagination everywhere | KEEP | Avoids OFFSET cliff; correct from day one | 0 (in design) |
-| Optimistic concurrency | DEFER-Phase-2 | Not needed until concurrent CMS edits expected | 2 days refactor |
-| Authz matrix test | KEEP | Essential for patient/money safety | in testing budget |
-| Testcontainers every PR | SIMPLIFY | Run full suite nightly; smoke tests only on PR | saves 4 min/PR |
-| Playwright e2e every PR | SIMPLIFY | Smoke subset on PR; full suite nightly | saves 5 min/PR |
-| k6 performance tests | DEFER-Phase-5 | Manual load test before Phase 3c/5; automate in Phase 5 | 2 h manual work |
-| Trivy scanning | DEFER-nightly | Move from every PR to nightly | saves 2 min/PR |
-| OpenAPI generation | DEFER-Phase-2 | Document manually Phase 0–1; automate in Phase 2 | 2 h setup Phase 2 |
-| Monthly restore test | SIMPLIFY | Run quarterly and before each release | saves 1 h/month |
-| Staging environment | SIMPLIFY | Use git branch on prod VPS Phase 0–2; separate VPS later | 0 overhead |
-| Drizzle ORM | KEEP | Better than Prisma; migrations are plain SQL | 0 (in stack) |
-| ESLint boundaries | DEFER-Phase-2 | Add after module layout proven | 1 h setup Phase 2 |
-| Audit_log partitioning | DEFER-Phase-6 | Partition at 5M rows (year 3–4), not 200k | 1 day work |
-| Nightly report snapshots | DEFER-Phase-5 | Reports not needed until Phase 5 | Phase 5 task |
+| Component                    | Verdict       | One-line reason                                                           | Cost of keeping          |
+| ---------------------------- | ------------- | ------------------------------------------------------------------------- | ------------------------ |
+| Loki + Promtail              | DEFER-Phase-6 | 256 MB RAM for logs; start with pino to file, grep in emergencies         | 256 MB + 2 h             |
+| Prometheus + exporters       | DEFER-Phase-6 | Full metrics stack not needed for v1; basic `/health` endpoint sufficient | 512 MB + 4 h             |
+| Grafana + dashboards         | DEFER-Phase-6 | Not needed until Phase 6; manual SQL queries + Uptime Kuma suffice        | 256 MB + 3 h             |
+| GlitchTip                    | CUT           | Loki provides error tracking; adds cost for zero v1 benefit               | 2 h + 128 MB             |
+| MinIO                        | SIMPLIFY      | 500 media files fit on local disk; migrate at §19 (volume scales)         | 256 MB + local disk free |
+| pg-boss + separate worker    | SIMPLIFY      | Run in-process Phase 0–2; split at §19 (>1000 jobs/min)                   | 256 MB + orch overhead   |
+| Separate migrate container   | SIMPLIFY      | Run migrations in app startup Phase 0–1; separate only multi-instance     | negligible               |
+| TOTP MFA                     | DEFER-Phase-2 | Password-only login Phase 1; add MFA after workflows proven               | 3 days dev in Phase 2    |
+| Argon2 memory=64 MiB         | SIMPLIFY      | Use 16 MiB for v1; still Argon2id, secure for staff directory             | 1 h tuning               |
+| Separate DB roles            | SIMPLIFY      | Single app role Phase 0–4; add readonly at Phase 6                        | negligible               |
+| Read-only container FS       | DEFER-Phase-6 | Nice-to-have security; skip v1 to reduce Dockerfile complexity            | 1 day work               |
+| Cloudflare proxy             | DEFER-Phase-6 | Plain DNS + certbot; add Cloudflare at Phase 6 if needed                  | optional, free           |
+| Keyset pagination everywhere | KEEP          | Avoids OFFSET cliff; correct from day one                                 | 0 (in design)            |
+| Optimistic concurrency       | DEFER-Phase-2 | Not needed until concurrent CMS edits expected                            | 2 days refactor          |
+| Authz matrix test            | KEEP          | Essential for patient/money safety                                        | in testing budget        |
+| Testcontainers every PR      | SIMPLIFY      | Run full suite nightly; smoke tests only on PR                            | saves 4 min/PR           |
+| Playwright e2e every PR      | SIMPLIFY      | Smoke subset on PR; full suite nightly                                    | saves 5 min/PR           |
+| k6 performance tests         | DEFER-Phase-5 | Manual load test before Phase 3c/5; automate in Phase 5                   | 2 h manual work          |
+| Trivy scanning               | DEFER-nightly | Move from every PR to nightly                                             | saves 2 min/PR           |
+| OpenAPI generation           | DEFER-Phase-2 | Document manually Phase 0–1; automate in Phase 2                          | 2 h setup Phase 2        |
+| Monthly restore test         | SIMPLIFY      | Run quarterly and before each release                                     | saves 1 h/month          |
+| Staging environment          | SIMPLIFY      | Use git branch on prod VPS Phase 0–2; separate VPS later                  | 0 overhead               |
+| Drizzle ORM                  | KEEP          | Better than Prisma; migrations are plain SQL                              | 0 (in stack)             |
+| ESLint boundaries            | DEFER-Phase-2 | Add after module layout proven                                            | 1 h setup Phase 2        |
+| Audit_log partitioning       | DEFER-Phase-6 | Partition at 5M rows (year 3–4), not 200k                                 | 1 day work               |
+| Nightly report snapshots     | DEFER-Phase-5 | Reports not needed until Phase 5                                          | Phase 5 task             |
 
 ## Minimum Viable Production v1
 
 **Compose services only:**
+
 - nginx (TLS, reverse proxy)
 - app (Next.js, single instance, in-process jobs)
 - postgres (single 16 instance)
@@ -66,6 +67,7 @@ The plan is well-designed but assumes resources that don't match reality: one so
 **Current:** 28 weeks over 7 phases. Phases 0–2 tight but realistic (10 weeks). **Phase 3 is the bottleneck:** 8 weeks for entire HMIS (patient master, tablet registration, encounters, referrals, clinic follow-up) = 160 hours for one part-time dev. Only credible if rework is minimal and testing is light.
 
 **Recommended reordering:**
+
 - **Merge Phases 0 & 1** into "Foundation + Auth" (5–6 weeks): login page ships day one; both are prerequisite for everything else.
 - **Keep Phase 2** (CMS + enquiries): 4 weeks.
 - **Split Phase 3 into two:**
@@ -87,6 +89,6 @@ The plan is well-designed but assumes resources that don't match reality: one so
 
 ## Core Architecture Remains Sound
 
-The decisions are solid: Drizzle (no engine binary), custom session auth (fully owned, 300 lines), modular monolith (lint-enforced boundaries), keyset pagination, authz matrix tests, Postgres as single source of truth. The over-engineering is in *tooling* (observability, CI complexity) and *premature scaling* (separate containers, advanced storage), not architecture.
+The decisions are solid: Drizzle (no engine binary), custom session auth (fully owned, 300 lines), modular monolith (lint-enforced boundaries), keyset pagination, authz matrix tests, Postgres as single source of truth. The over-engineering is in _tooling_ (observability, CI complexity) and _premature scaling_ (separate containers, advanced storage), not architecture.
 
 **Verdict:** Ship the minimum compose stack now. Validate operations with real data. Add observability and scale patterns at Phase 6 and §19 thresholds. A solo dev's best tool is early, messy feedback from production; perfect infrastructure before the product works is a trap.

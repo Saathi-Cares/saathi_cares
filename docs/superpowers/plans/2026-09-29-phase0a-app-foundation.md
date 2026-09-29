@@ -40,12 +40,14 @@ Inputs the spec implies but no task's tests cover unless added here. Each line's
 ### Task 1: Replace the Vite scaffold with a Next.js 16 application
 
 **Files:**
+
 - Create: `app/layout.tsx`, `app/page.tsx` (temporary placeholder, replaced in Task 10), `app/globals.css`, `next.config.ts`, `next-env.d.ts` (generated), `.prettierrc`, `.nvmrc`
 - Modify: `package.json`, `tsconfig.json`, `tailwind.config.ts`, `postcss.config.js`, `.gitignore`, `components.json`
 - Delete: `vite.config.ts`, `index.html`, `tsconfig.app.json`, `tsconfig.node.json`, `src/main.tsx`, `src/App.tsx`, `src/App.css`, `src/vite-env.d.ts`, `src/index.css` (moved), `src/pages/**`, `src/lib/audit.ts`, `src/lib/auth.ts`, `src/lib/camps.ts`, `src/lib/cms.ts` (content moved in Task 10), `src/lib/donations.ts`, `src/lib/hmis.ts`, `src/lib/intake.ts`, `src/lib/rbac.ts`, `src/lib/storage.ts`, `src/lib/validations.ts`, `src/hooks/useCMS.ts`, `src/components/NavLink.tsx`, `dist/`
 - Keep: `src/components/ui/**`, `src/components/layout/**`, `src/components/sections/**` (repaired in Task 10), `src/hooks/use-mobile.tsx`, `src/hooks/use-toast.ts`, `src/lib/utils.ts`, `src/assets/hero-dental-camp.jpg`, `public/**`, `tailwind.config.ts` theme
 
 **Interfaces:**
+
 - Produces: a buildable Next.js app; `npm run dev`, `npm run build`, `npm run start` work; `@/` alias resolves to `src/`.
 
 - [ ] **Step 1: Remove the Vite runtime and the localStorage data layer**
@@ -189,8 +191,19 @@ import type { Metadata } from 'next';
 import { Inter, Lora } from 'next/font/google';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-inter', display: 'swap' });
-const lora = Lora({ subsets: ['latin'], weight: ['400', '500', '600', '700'], style: ['normal', 'italic'], variable: '--font-lora', display: 'swap' });
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+const lora = Lora({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-lora',
+  display: 'swap',
+});
 
 const siteUrl = 'https://cares.saathiventures.com';
 
@@ -200,7 +213,15 @@ export const metadata: Metadata = {
   description:
     'Saathi Cares by SHC Foundation provides free dental camps, school oral health programs, and community outreach to underserved communities across India.',
   authors: [{ name: 'SHC Foundation (Saathi Ventures)' }],
-  keywords: ['oral health', 'dental care', 'nonprofit', 'India', 'Saathi Ventures', 'SHC Foundation', 'dental camps'],
+  keywords: [
+    'oral health',
+    'dental care',
+    'nonprofit',
+    'India',
+    'Saathi Ventures',
+    'SHC Foundation',
+    'dental camps',
+  ],
   alternates: { canonical: siteUrl },
   openGraph: {
     type: 'website',
@@ -208,7 +229,8 @@ export const metadata: Metadata = {
     siteName: 'Saathi Cares',
     locale: 'en_IN',
     title: 'Saathi Cares | Taking Oral Healthcare to the Last Mile',
-    description: 'Free dental camps, school programs, and community outreach for underserved communities across India.',
+    description:
+      'Free dental camps, school programs, and community outreach for underserved communities across India.',
     images: [{ url: '/og-image.jpg' }],
   },
   twitter: { card: 'summary_large_image', images: ['/og-image.jpg'] },
@@ -221,8 +243,15 @@ const organisationJsonLd = {
   name: 'Saathi Cares',
   alternateName: 'SHC Foundation',
   url: siteUrl,
-  description: 'Taking oral healthcare to the last mile: free dental camps and programs for underserved communities across India.',
-  address: { '@type': 'PostalAddress', addressLocality: 'Gurugram', addressRegion: 'Haryana', postalCode: '122001', addressCountry: 'IN' },
+  description:
+    'Taking oral healthcare to the last mile: free dental camps and programs for underserved communities across India.',
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: 'Gurugram',
+    addressRegion: 'Haryana',
+    postalCode: '122001',
+    addressCountry: 'IN',
+  },
   sameAs: ['https://www.linkedin.com/company/saathiventures', 'https://twitter.com/saathiventures'],
 };
 
@@ -231,7 +260,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${lora.variable}`}>
       <body className="font-sans antialiased">
         {children}
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organisationJsonLd) }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organisationJsonLd) }}
+        />
       </body>
     </html>
   );
@@ -288,10 +320,12 @@ Report: files removed, packages installed with versions from `package-lock.json`
 ### Task 2: Tooling — ESLint with import boundaries, Prettier, Vitest, Playwright
 
 **Files:**
+
 - Create: `eslint.config.mjs`, `vitest.config.ts`, `playwright.config.ts`, `src/lib/utils.test.ts`, `e2e/smoke/home.spec.ts`
 - Delete: `eslint.config.js`
 
 **Interfaces:**
+
 - Produces: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:e2e` all runnable; boundary rule `saathi/server-boundary` behaviour documented below.
 
 - [ ] **Step 1: Write `eslint.config.mjs`**
@@ -322,7 +356,18 @@ export default defineConfig([
         'error',
         {
           patterns: [
-            { group: ['@/components/*', '@/hooks/*', 'react', 'react-dom', 'next/navigation', 'next/link', 'next/image'], message: 'src/server must not import UI or client code (PLAN.md §7).' },
+            {
+              group: [
+                '@/components/*',
+                '@/hooks/*',
+                'react',
+                'react-dom',
+                'next/navigation',
+                'next/link',
+                'next/image',
+              ],
+              message: 'src/server must not import UI or client code (PLAN.md §7).',
+            },
           ],
         },
       ],
@@ -332,7 +377,14 @@ export default defineConfig([
     // UI never reaches into the backend.
     files: ['src/components/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [{ group: ['@/server/*'], message: 'Components must not import the server layer (PLAN.md §7).' }] }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@/server/*'], message: 'Components must not import the server layer (PLAN.md §7).' },
+          ],
+        },
+      ],
     },
   },
 ]);
@@ -400,7 +452,12 @@ export default defineConfig({
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : { command: 'npm run start', url: 'http://localhost:3000/api/health', reuseExistingServer: true, timeout: 60_000 },
+    : {
+        command: 'npm run start',
+        url: 'http://localhost:3000/api/health',
+        reuseExistingServer: true,
+        timeout: 60_000,
+      },
 });
 ```
 
@@ -438,9 +495,11 @@ Report: lint/typecheck/test output. Do not commit.
 ### Task 3: Server configuration from the environment
 
 **Files:**
+
 - Create: `src/server/config.ts`, `src/server/config.test.ts`, `.env.example`
 
 **Interfaces:**
+
 - Produces: `loadConfig(env: NodeJS.ProcessEnv): AppConfig` (pure, throws `ConfigError` listing every invalid variable), `getConfig(): AppConfig` (memoised from `process.env`), type `AppConfig`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -468,7 +527,9 @@ describe('loadConfig', () => {
   });
 
   it('lists every missing or invalid variable in one error', () => {
-    expect(() => loadConfig({ ...valid, APP_URL: 'not-a-url', MEDIA_SIGNING_SECRET: 'short' })).toThrowError(ConfigError);
+    expect(() => loadConfig({ ...valid, APP_URL: 'not-a-url', MEDIA_SIGNING_SECRET: 'short' })).toThrowError(
+      ConfigError,
+    );
     try {
       loadConfig({ ...valid, APP_URL: 'not-a-url', MEDIA_SIGNING_SECRET: 'short' });
     } catch (err) {
@@ -633,9 +694,11 @@ Report test output and the variable list. Do not commit.
 ### Task 4: Logger with deep redaction and request context
 
 **Files:**
+
 - Create: `src/server/observability/redaction.ts`, `src/server/observability/redaction.test.ts`, `src/server/observability/logger.ts`, `src/server/observability/logger.test.ts`, `src/server/observability/request-context.ts`, `src/server/observability/request-context.test.ts`
 
 **Interfaces:**
+
 - Produces: `REDACTED_KEYS: ReadonlySet<string>`, `redactDeep<T>(value: T): T`, `logger` (pino root), `getLogger(): pino.Logger` (request-bound child when inside a request context), `runWithRequestContext<T>(ctx: RequestContext, fn: () => Promise<T>): Promise<T>`, `getRequestContext(): RequestContext | undefined`, type `RequestContext = { requestId: string; userId?: string }`.
 
 - [ ] **Step 1: Failing tests for redaction**
@@ -649,7 +712,11 @@ import { REDACTED_KEYS, redactDeep } from './redaction';
 describe('redactDeep', () => {
   it('redacts sensitive keys at any depth, case-insensitively', () => {
     const input = { a: { b: { Phone: '9876543210', keep: 1 } }, list: [{ password: 'x' }], email: 'a@b.c' };
-    expect(redactDeep(input)).toEqual({ a: { b: { Phone: '[redacted]', keep: 1 } }, list: [{ password: '[redacted]' }], email: '[redacted]' });
+    expect(redactDeep(input)).toEqual({
+      a: { b: { Phone: '[redacted]', keep: 1 } },
+      list: [{ password: '[redacted]' }],
+      email: '[redacted]',
+    });
   });
 
   it('does not mutate the input', () => {
@@ -665,7 +732,19 @@ describe('redactDeep', () => {
   });
 
   it('includes the PLAN.md §8.9 tier-2/3 field names', () => {
-    for (const k of ['phone', 'address_line', 'medical_history', 'dental_history', 'checklist', 'clinical_findings', 'medications', 'content_summary', 'password', 'mfa_secret', 'vitals']) {
+    for (const k of [
+      'phone',
+      'address_line',
+      'medical_history',
+      'dental_history',
+      'checklist',
+      'clinical_findings',
+      'medications',
+      'content_summary',
+      'password',
+      'mfa_secret',
+      'vitals',
+    ]) {
       expect(REDACTED_KEYS.has(k)).toBe(true);
     }
   });
@@ -680,13 +759,45 @@ Expected: FAIL, module not found.
 ```ts
 export const REDACTED_KEYS: ReadonlySet<string> = new Set([
   // credentials
-  'password', 'password_hash', 'mfa_secret', 'mfa_secret_enc', 'token', 'secret', 'authorization', 'cookie',
+  'password',
+  'password_hash',
+  'mfa_secret',
+  'mfa_secret_enc',
+  'token',
+  'secret',
+  'authorization',
+  'cookie',
   // tier 2 identifiers (PLAN.md §8.9)
-  'phone', 'alt_phone', 'email', 'address', 'address_line', 'guardian_name', 'dob', 'pan', 'pan_enc', 'value_enc', 'identifiers',
+  'phone',
+  'alt_phone',
+  'email',
+  'address',
+  'address_line',
+  'guardian_name',
+  'dob',
+  'pan',
+  'pan_enc',
+  'value_enc',
+  'identifiers',
   // tier 3 clinical
-  'medical_history', 'dental_history', 'vitals', 'chief_complaint', 'presenting_symptoms', 'volunteer_notes', 'checklist',
-  'result', 'clinical_findings', 'soft_tissue_findings', 'diagnosis_summary', 'medications', 'general_instructions',
-  'follow_up_instructions', 'content_summary', 'notes', 'baseline', 'content',
+  'medical_history',
+  'dental_history',
+  'vitals',
+  'chief_complaint',
+  'presenting_symptoms',
+  'volunteer_notes',
+  'checklist',
+  'result',
+  'clinical_findings',
+  'soft_tissue_findings',
+  'diagnosis_summary',
+  'medications',
+  'general_instructions',
+  'follow_up_instructions',
+  'content_summary',
+  'notes',
+  'baseline',
+  'content',
 ]);
 
 const CENSOR = '[redacted]';
@@ -814,9 +925,11 @@ Do not commit.
 ### Task 5: Error taxonomy and response envelope
 
 **Files:**
+
 - Create: `src/server/http/errors.ts`, `src/server/http/errors.test.ts`
 
 **Interfaces:**
+
 - Produces: classes `AppError`, `ValidationError`, `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `InvalidTransitionError`, `RateLimitedError`, `ExternalServiceError`, `InternalError`; `type ErrorDetail = { path: string; message: string }`; `toErrorResponse(err: unknown, requestId: string): { status: number; body: ErrorBody; logLevel: 'warn' | 'error' }`; `fromPgError(err: unknown): AppError | undefined`.
 
 - [ ] **Step 1: Failing tests**
@@ -829,7 +942,10 @@ import { ConflictError, ExternalServiceError, ValidationError, fromPgError, toEr
 
 describe('toErrorResponse', () => {
   it('maps a ValidationError to 400 with details', () => {
-    const r = toErrorResponse(new ValidationError('Invalid input', [{ path: 'phone', message: 'Required' }]), 'req-1');
+    const r = toErrorResponse(
+      new ValidationError('Invalid input', [{ path: 'phone', message: 'Required' }]),
+      'req-1',
+    );
     expect(r.status).toBe(400);
     expect(r.body.error.code).toBe('VALIDATION_FAILED');
     expect(r.body.error.details).toEqual([{ path: 'phone', message: 'Required' }]);
@@ -943,13 +1059,20 @@ export class RateLimitedError extends AppError {
 export class ExternalServiceError extends AppError {
   readonly service: string;
   constructor(service: string, message: string, opts: { retryable: boolean; cause?: unknown }) {
-    super(opts.retryable ? 'EXTERNAL_SERVICE_UNAVAILABLE' : 'EXTERNAL_SERVICE_FAILED', opts.retryable ? 503 : 502, message, opts);
+    super(
+      opts.retryable ? 'EXTERNAL_SERVICE_UNAVAILABLE' : 'EXTERNAL_SERVICE_FAILED',
+      opts.retryable ? 503 : 502,
+      message,
+      opts,
+    );
     this.service = service;
   }
 }
 export class InternalError extends AppError {
   constructor(cause?: unknown) {
-    super('INTERNAL_ERROR', 500, 'Something went wrong. Quote the request id when reporting this.', { cause });
+    super('INTERNAL_ERROR', 500, 'Something went wrong. Quote the request id when reporting this.', {
+      cause,
+    });
   }
 }
 
@@ -968,7 +1091,10 @@ export function fromPgError(err: unknown): AppError | undefined {
   if (typeof pg.code !== 'string') return undefined;
   switch (pg.code) {
     case PG_UNIQUE:
-      return new ConflictError(`Already exists (${pg.constraint ?? 'unique constraint'})`, pg.constraint ? [{ path: pg.constraint, message: 'must be unique' }] : undefined);
+      return new ConflictError(
+        `Already exists (${pg.constraint ?? 'unique constraint'})`,
+        pg.constraint ? [{ path: pg.constraint, message: 'must be unique' }] : undefined,
+      );
     case PG_FK:
       return new ValidationError(`Referenced record does not exist (${pg.constraint ?? 'foreign key'})`);
     case PG_CHECK:
@@ -982,7 +1108,10 @@ export function fromPgError(err: unknown): AppError | undefined {
   }
 }
 
-export function toErrorResponse(err: unknown, requestId: string): { status: number; body: ErrorBody; logLevel: 'warn' | 'error' } {
+export function toErrorResponse(
+  err: unknown,
+  requestId: string,
+): { status: number; body: ErrorBody; logLevel: 'warn' | 'error' } {
   const appError = err instanceof AppError ? err : (fromPgError(err) ?? new InternalError(err));
   const isServerFault = appError.httpStatus >= 500;
   return {
@@ -1012,10 +1141,12 @@ Expected: 5 passed.
 ### Task 6: Postgres client and SQL migration runner
 
 **Files:**
+
 - Create: `src/server/db/client.ts`, `src/server/db/migrate.ts`, `src/server/db/migrate-cli.ts`, `src/server/db/migrate.int.test.ts`, `src/server/db/migrations/0001_init.sql`
 - Requires: a local Postgres reachable at the `.env.test` `DATABASE_URL`. Until Phase 0B's compose exists, start one with `docker run --name saathi-test-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=saathi_test -p 5432:5432 -d postgres:16`.
 
 **Interfaces:**
+
 - Produces: `getPool(): pg.Pool`, `getDb(): NodePgDatabase`, `closeDb(): Promise<void>`, `type Db = NodePgDatabase`, `type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]`; `runMigrations(opts: { connectionString: string; dir: string; log?: (msg: string) => void }): Promise<{ applied: string[] }>`; `dist/migrate.js` (built by `npm run build:migrate`) exiting 0 on success, 1 on failure.
 
 - [ ] **Step 1: Write the first migration**
@@ -1059,7 +1190,9 @@ describe('runMigrations', () => {
     expect(second.applied).toEqual([]);
     const rows = await pool.query('select name from schema_migrations order by name');
     expect(rows.rows.map((r) => r.name)).toContain('0001_init.sql');
-    const ext = await pool.query("select extname from pg_extension where extname in ('citext','pg_trgm','pgcrypto')");
+    const ext = await pool.query(
+      "select extname from pg_extension where extname in ('citext','pg_trgm','pgcrypto')",
+    );
     expect(ext.rowCount).toBe(3);
   });
 
@@ -1075,7 +1208,9 @@ describe('runMigrations', () => {
   });
 
   it('reports an unreachable database in one line', async () => {
-    await expect(runMigrations({ connectionString: 'postgres://x:y@localhost:59999/nope', dir })).rejects.toThrow(/localhost:59999/);
+    await expect(
+      runMigrations({ connectionString: 'postgres://x:y@localhost:59999/nope', dir }),
+    ).rejects.toThrow(/localhost:59999/);
   });
 });
 ```
@@ -1151,7 +1286,9 @@ export async function runMigrations(opts: Options): Promise<{ applied: string[] 
     await client.query(`select pg_advisory_lock($1)`, [LOCK_KEY]);
     await client.query(`create table if not exists schema_migrations (
       name text primary key, applied_at timestamptz not null default now())`);
-    const done = new Set((await client.query<{ name: string }>('select name from schema_migrations')).rows.map((r) => r.name));
+    const done = new Set(
+      (await client.query<{ name: string }>('select name from schema_migrations')).rows.map((r) => r.name),
+    );
     const files = (await fs.readdir(opts.dir)).filter((f) => f.endsWith('.sql')).sort();
     for (const file of files) {
       if (done.has(file)) continue;
@@ -1216,15 +1353,29 @@ Expected: `schema up to date`, exit 0.
 ### Task 7: The route handler wrapper
 
 **Files:**
+
 - Create: `src/server/http/handler.ts`, `src/server/http/handler.test.ts`, `src/server/http/request-id.ts`
 
 **Interfaces:**
+
 - Produces:
   ```ts
   type Permission = 'public'; // Phase 1 extends this to the permission strings in PLAN.md §10.2
-  type HandlerContext<TBody, TQuery> = { requestId: string; body: TBody; query: TQuery; params: Record<string, string>; db: Db; tx: Tx | undefined; log: Logger; request: Request };
+  type HandlerContext<TBody, TQuery> = {
+    requestId: string;
+    body: TBody;
+    query: TQuery;
+    params: Record<string, string>;
+    db: Db;
+    tx: Tx | undefined;
+    log: Logger;
+    request: Request;
+  };
   type HandlerResult = { status?: number; data: unknown } | Response;
-  function withHandler<TBody = undefined, TQuery = undefined>(spec: { permission: Permission; body?: ZodType<TBody>; query?: ZodType<TQuery>; transactional?: boolean }, fn: (ctx: HandlerContext<TBody, TQuery>) => Promise<HandlerResult>): (request: Request, routeCtx: { params: Promise<Record<string, string>> }) => Promise<Response>
+  function withHandler<TBody = undefined, TQuery = undefined>(
+    spec: { permission: Permission; body?: ZodType<TBody>; query?: ZodType<TQuery>; transactional?: boolean },
+    fn: (ctx: HandlerContext<TBody, TQuery>) => Promise<HandlerResult>,
+  ): (request: Request, routeCtx: { params: Promise<Record<string, string>> }) => Promise<Response>;
   ```
   `transactional` defaults to `true` for POST/PATCH/PUT/DELETE and `false` for GET/HEAD.
 - Consumes: `toErrorResponse`, `ValidationError` (Task 5); `getDb` (Task 6); `runWithRequestContext`, `getLogger` (Task 4).
@@ -1250,21 +1401,41 @@ const routeCtx = { params: Promise.resolve({ id: '42' }) };
 
 describe('withHandler', () => {
   it('validates the body and passes params, request id and a transaction for POST', async () => {
-    const handler = withHandler({ permission: 'public', body: z.object({ name: z.string().min(1) }) }, async (ctx) => {
-      expect(ctx.params.id).toBe('42');
-      expect(ctx.tx).toEqual({ tag: 'tx' });
-      expect(ctx.requestId).toMatch(/^[0-9a-f-]{36}$/);
-      return { status: 201, data: { name: ctx.body.name } };
-    });
-    const res = await handler(new Request('http://t/api/v1/x', { method: 'POST', body: JSON.stringify({ name: 'a' }), headers: { 'content-type': 'application/json' } }), routeCtx);
+    const handler = withHandler(
+      { permission: 'public', body: z.object({ name: z.string().min(1) }) },
+      async (ctx) => {
+        expect(ctx.params.id).toBe('42');
+        expect(ctx.tx).toEqual({ tag: 'tx' });
+        expect(ctx.requestId).toMatch(/^[0-9a-f-]{36}$/);
+        return { status: 201, data: { name: ctx.body.name } };
+      },
+    );
+    const res = await handler(
+      new Request('http://t/api/v1/x', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'a' }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      routeCtx,
+    );
     expect(res.status).toBe(201);
     expect(res.headers.get('x-request-id')).toBeTruthy();
     expect(await res.json()).toEqual({ data: { name: 'a' } });
   });
 
   it('returns 400 with field details on invalid body', async () => {
-    const handler = withHandler({ permission: 'public', body: z.object({ name: z.string().min(1) }) }, async () => ({ data: null }));
-    const res = await handler(new Request('http://t/x', { method: 'POST', body: JSON.stringify({ name: '' }), headers: { 'content-type': 'application/json' } }), routeCtx);
+    const handler = withHandler(
+      { permission: 'public', body: z.object({ name: z.string().min(1) }) },
+      async () => ({ data: null }),
+    );
+    const res = await handler(
+      new Request('http://t/x', {
+        method: 'POST',
+        body: JSON.stringify({ name: '' }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      routeCtx,
+    );
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe('VALIDATION_FAILED');
@@ -1272,18 +1443,30 @@ describe('withHandler', () => {
   });
 
   it('returns 400, not 500, when the JSON body is not an object', async () => {
-    const handler = withHandler({ permission: 'public', body: z.object({ name: z.string() }) }, async () => ({ data: null }));
+    const handler = withHandler({ permission: 'public', body: z.object({ name: z.string() }) }, async () => ({
+      data: null,
+    }));
     for (const raw of ['[1,2]', '"str"', 'null', '{bad json']) {
-      const res = await handler(new Request('http://t/x', { method: 'POST', body: raw, headers: { 'content-type': 'application/json' } }), routeCtx);
+      const res = await handler(
+        new Request('http://t/x', {
+          method: 'POST',
+          body: raw,
+          headers: { 'content-type': 'application/json' },
+        }),
+        routeCtx,
+      );
       expect(res.status).toBe(400);
     }
   });
 
   it('parses query params and does not open a transaction for GET', async () => {
-    const handler = withHandler({ permission: 'public', query: z.object({ limit: z.coerce.number().max(100).default(25) }) }, async (ctx) => {
-      expect(ctx.tx).toBeUndefined();
-      return { data: { limit: ctx.query.limit } };
-    });
+    const handler = withHandler(
+      { permission: 'public', query: z.object({ limit: z.coerce.number().max(100).default(25) }) },
+      async (ctx) => {
+        expect(ctx.tx).toBeUndefined();
+        return { data: { limit: ctx.query.limit } };
+      },
+    );
     const res = await handler(new Request('http://t/x?limit=10'), routeCtx);
     expect(await res.json()).toEqual({ data: { limit: 10 } });
   });
@@ -1292,7 +1475,10 @@ describe('withHandler', () => {
     const handler = withHandler({ permission: 'public' }, async () => {
       throw new NotFoundError('Patient');
     });
-    const res = await handler(new Request('http://t/x', { headers: { 'x-request-id': 'client-id-1' } }), routeCtx);
+    const res = await handler(
+      new Request('http://t/x', { headers: { 'x-request-id': 'client-id-1' } }),
+      routeCtx,
+    );
     expect(res.status).toBe(404);
     expect((await res.json()).error.request_id).toBe('client-id-1');
   });
@@ -1382,13 +1568,33 @@ export function withHandler<TBody = undefined, TQuery = undefined>(
         const transactional = spec.transactional ?? MUTATING.has(request.method);
         const run = (tx: Tx | undefined) => fn({ requestId, body, query, params, db, tx, log, request });
         const result = transactional ? await db.transaction((tx) => run(tx)) : await run(undefined);
-        const response = result instanceof Response ? result : Response.json({ data: result.data }, { status: result.status ?? 200 });
+        const response =
+          result instanceof Response
+            ? result
+            : Response.json({ data: result.data }, { status: result.status ?? 200 });
         response.headers.set('x-request-id', requestId);
-        log.info({ route: new URL(request.url).pathname, method: request.method, status: response.status, duration_ms: Date.now() - started }, 'request');
+        log.info(
+          {
+            route: new URL(request.url).pathname,
+            method: request.method,
+            status: response.status,
+            duration_ms: Date.now() - started,
+          },
+          'request',
+        );
         return response;
       } catch (err) {
         const { status, body, logLevel } = toErrorResponse(err, requestId);
-        log[logLevel]({ route: new URL(request.url).pathname, method: request.method, status, duration_ms: Date.now() - started, err }, 'request failed');
+        log[logLevel](
+          {
+            route: new URL(request.url).pathname,
+            method: request.method,
+            status,
+            duration_ms: Date.now() - started,
+            err,
+          },
+          'request failed',
+        );
         const response = Response.json(body, { status });
         response.headers.set('x-request-id', requestId);
         return response;
@@ -1405,7 +1611,8 @@ async function parseBody<T>(request: Request, schema: ZodType<T> | undefined): P
   } catch {
     throw new ValidationError('Body must be valid JSON');
   }
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new ValidationError('Body must be a JSON object');
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw))
+    throw new ValidationError('Body must be a JSON object');
   return parseWith(schema, raw);
 }
 
@@ -1418,7 +1625,10 @@ function parseQuery<T>(request: Request, schema: ZodType<T> | undefined): T {
 function parseWith<T>(schema: ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (result.success) return result.data;
-  const details: ErrorDetail[] = result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
+  const details: ErrorDetail[] = result.error.issues.map((i) => ({
+    path: i.path.join('.'),
+    message: i.message,
+  }));
   throw new ValidationError('Invalid input', details);
 }
 ```
@@ -1437,21 +1647,31 @@ Expected: all pass.
 ### Task 8: Local storage adapter and health endpoints
 
 **Files:**
+
 - Create: `src/server/storage/adapter.ts`, `src/server/storage/local.ts`, `src/server/storage/local.test.ts`, `src/server/storage/index.ts`, `src/server/health/readiness.ts`, `src/server/health/readiness.int.test.ts`, `app/api/health/route.ts`, `app/api/health/ready/route.ts`
 
 **Interfaces:**
+
 - Produces:
+
   ```ts
   interface StorageAdapter {
-    put(key: string, data: Buffer | NodeJS.ReadableStream, opts: { contentType: string }): Promise<{ bytes: number; sha256: string }>;
+    put(
+      key: string,
+      data: Buffer | NodeJS.ReadableStream,
+      opts: { contentType: string },
+    ): Promise<{ bytes: number; sha256: string }>;
     get(key: string): Promise<NodeJS.ReadableStream>;
     exists(key: string): Promise<boolean>;
     delete(key: string): Promise<void>;
     probeWritable(): Promise<void>; // throws ExternalServiceError('storage', ...) when not writable
   }
-  function getStorage(): StorageAdapter
-  function checkReadiness(deps?): Promise<{ ok: boolean; checks: Record<'database' | 'storage' | 'jobs', 'ok' | string> }>
+  function getStorage(): StorageAdapter;
+  function checkReadiness(
+    deps?,
+  ): Promise<{ ok: boolean; checks: Record<'database' | 'storage' | 'jobs', 'ok' | string> }>;
   ```
+
   `key` is a relative path like `private/screenings/<uuid>.jpg`; anything containing `..`, a leading `/`, a backslash, or a drive letter is rejected with `ValidationError`.
 
 - [ ] **Step 1: Failing tests for the local adapter**
@@ -1546,11 +1766,16 @@ export class LocalStorageAdapter implements StorageAdapter {
   private resolve(key: string): string {
     if (!KEY_PATTERN.test(key) || key.includes('..')) throw new ValidationError(`Invalid storage key`);
     const full = path.resolve(this.root, key);
-    if (!full.startsWith(path.resolve(this.root) + path.sep)) throw new ValidationError('Invalid storage key');
+    if (!full.startsWith(path.resolve(this.root) + path.sep))
+      throw new ValidationError('Invalid storage key');
     return full;
   }
 
-  async put(key: string, data: Buffer | NodeJS.ReadableStream, _opts: { contentType: string }): Promise<PutResult> {
+  async put(
+    key: string,
+    data: Buffer | NodeJS.ReadableStream,
+    _opts: { contentType: string },
+  ): Promise<PutResult> {
     const full = this.resolve(key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     const hash = createHash('sha256');
@@ -1593,7 +1818,10 @@ export class LocalStorageAdapter implements StorageAdapter {
       await fs.writeFile(probe, 'ok');
       await fs.rm(probe);
     } catch (err) {
-      throw new ExternalServiceError('storage', `Media root is not writable: ${this.root}`, { retryable: true, cause: err });
+      throw new ExternalServiceError('storage', `Media root is not writable: ${this.root}`, {
+        retryable: true,
+        cause: err,
+      });
     }
   }
 }
@@ -1739,18 +1967,25 @@ Stop the server.
 ### Task 9: In-process job queue (pg-boss) and application boot
 
 **Files:**
+
 - Create: `src/server/jobs/boss.ts`, `src/server/jobs/definitions/index.ts`, `src/server/jobs/definitions/system-noop.ts`, `src/server/jobs/start-consumer.ts`, `src/server/jobs/boss.int.test.ts`, `src/server/boot.ts`, `instrumentation.ts`
 - Modify: `src/server/health/readiness.ts` (`jobsFlag` already exported; no change needed), `.env.test` (no change; jobs are started explicitly in the test)
 
 **Interfaces:**
+
 - Produces:
   ```ts
-  type JobDefinition<TData> = { name: string; schema: ZodType<TData>; options: { retryLimit: number; retryBackoff: boolean; retryDelay: number }; handle: (data: TData, ctx: { log: Logger }) => Promise<void> };
-  function defineJob<TData>(def: JobDefinition<TData>): JobDefinition<TData>
-  function getBoss(): Promise<PgBoss>              // started singleton
-  function enqueue<TData>(def: JobDefinition<TData>, data: TData, opts?: { tx?: Tx }): Promise<string>  // job id; tx makes it transactional
-  function startConsumer(): Promise<void>          // registers every definition with boss.work, sets jobsFlag.started
-  function stopJobs(): Promise<void>
+  type JobDefinition<TData> = {
+    name: string;
+    schema: ZodType<TData>;
+    options: { retryLimit: number; retryBackoff: boolean; retryDelay: number };
+    handle: (data: TData, ctx: { log: Logger }) => Promise<void>;
+  };
+  function defineJob<TData>(def: JobDefinition<TData>): JobDefinition<TData>;
+  function getBoss(): Promise<PgBoss>; // started singleton
+  function enqueue<TData>(def: JobDefinition<TData>, data: TData, opts?: { tx?: Tx }): Promise<string>; // job id; tx makes it transactional
+  function startConsumer(): Promise<void>; // registers every definition with boss.work, sets jobsFlag.started
+  function stopJobs(): Promise<void>;
   ```
 - Consumes: `getConfig`, `getLogger`, `jobsFlag`, `Tx`.
 
@@ -1807,7 +2042,9 @@ describe('jobs', () => {
 
   it('rejects data that fails the job schema before enqueueing', async () => {
     // why: cast to defeat the compile-time type on purpose; the runtime check is what we test
-    await expect(enqueue(systemNoop, { marker: 42 } as unknown as { marker: string })).rejects.toThrow(/marker/);
+    await expect(enqueue(systemNoop, { marker: 42 } as unknown as { marker: string })).rejects.toThrow(
+      /marker/,
+    );
   });
 });
 ```
@@ -1874,7 +2111,11 @@ export function getBoss(): Promise<PgBoss> {
   if (boss) return Promise.resolve(boss);
   if (!starting) {
     starting = (async () => {
-      const instance = new PgBoss({ connectionString: getConfig().databaseUrl, schema: 'pgboss', migrate: true });
+      const instance = new PgBoss({
+        connectionString: getConfig().databaseUrl,
+        schema: 'pgboss',
+        migrate: true,
+      });
       instance.on('error', (err) => logger.error({ err }, 'pg-boss error'));
       await instance.start();
       boss = instance;
@@ -1891,16 +2132,25 @@ export async function stopJobs(): Promise<void> {
   starting = undefined;
 }
 
-export async function enqueue<TData>(def: JobDefinition<TData>, data: TData, opts: { tx?: Tx } = {}): Promise<string> {
+export async function enqueue<TData>(
+  def: JobDefinition<TData>,
+  data: TData,
+  opts: { tx?: Tx } = {},
+): Promise<string> {
   const parsed = def.schema.safeParse(data);
   if (!parsed.success) {
-    throw new ValidationError(`Job ${def.name} data invalid`, parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })));
+    throw new ValidationError(
+      `Job ${def.name} data invalid`,
+      parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+    );
   }
   const instance = await getBoss();
   await instance.createQueue(def.name).catch(() => undefined); // idempotent; exists after first call
   const tx = opts.tx;
   // why: pg-boss transactional send needs the raw pg client that the drizzle transaction is running on
-  const db = tx ? { executeSql: (text: string, values?: unknown[]) => tx.session.client.query(text, values) } : undefined;
+  const db = tx
+    ? { executeSql: (text: string, values?: unknown[]) => tx.session.client.query(text, values) }
+    : undefined;
   const id = await instance.send(def.name, parsed.data as object, { ...def.options, ...(db ? { db } : {}) });
   if (!id) throw new Error(`pg-boss refused job ${def.name}`);
   getLogger().info({ job: def.name, job_id: id }, 'job enqueued');
@@ -1941,7 +2191,10 @@ export async function startConsumer(): Promise<void> {
     });
   }
   jobsFlag.started = true;
-  logger.info({ queues: jobDefinitions.map((d) => d.name), concurrency: cfg.jobsConcurrency }, 'job consumer started');
+  logger.info(
+    { queues: jobDefinitions.map((d) => d.name), concurrency: cfg.jobsConcurrency },
+    'job consumer started',
+  );
 }
 ```
 
@@ -2005,11 +2258,13 @@ Expected: `"jobs":"ok"`. Then send SIGINT (Ctrl+C) and confirm the log shows `sh
 ### Task 10: Port the public pages as static server-rendered content
 
 **Files:**
+
 - Create: `src/content/site.ts`, `src/content/site.test.ts`, `app/(public)/layout.tsx`, `app/(public)/page.tsx`, `app/(public)/contact/page.tsx`, `app/(public)/donate/page.tsx`, `app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`, `e2e/smoke/contact.spec.ts`
 - Modify: every file in `src/components/sections/`, `src/components/layout/Header.tsx`, `src/components/layout/Footer.tsx`
 - Delete: `app/page.tsx` (placeholder from Task 1), `src/lib/cms.ts`
 
 **Interfaces:**
+
 - Produces: `siteContent: SiteContent` (typed, readonly) with `hero`, `about`, `programs`, `impact`, `team`, `contact`, `cta`; each section component takes its content as a prop: `<Hero content={siteContent.hero} />`.
 
 - [ ] **Step 1: Move the default content into a typed static module**
@@ -2052,7 +2307,14 @@ For every file in `src/components/sections/*.tsx` and `src/components/layout/*.t
 4. Replace the hero image: `import heroImage from '@/assets/hero-dental-camp.jpg'` stays; render with `next/image`:
    ```tsx
    import Image from 'next/image';
-   <Image src={heroImage} alt="Dental health camp serving rural communities" fill priority sizes="100vw" className="object-cover" />
+   <Image
+     src={heroImage}
+     alt="Dental health camp serving rural communities"
+     fill
+     priority
+     sizes="100vw"
+     className="object-cover"
+   />;
    ```
    and make the wrapping `div` `relative`.
 5. `Header.tsx`: replace `NavLink`/`useLocation` with `next/link` plus `usePathname()` from `next/navigation` for the active state; keep the mobile menu.
@@ -2127,7 +2389,9 @@ export default function ContactPage() {
           <div key={item.title}>
             <dt className="font-medium">{item.title}</dt>
             {item.details.map((line) => (
-              <dd key={line} className="text-muted-foreground">{line}</dd>
+              <dd key={line} className="text-muted-foreground">
+                {line}
+              </dd>
             ))}
           </div>
         ))}
@@ -2135,7 +2399,9 @@ export default function ContactPage() {
       <h2 className="font-serif text-2xl mt-16">Where we work</h2>
       <ul className="mt-4 flex flex-wrap gap-3">
         {contact.operationAreas.map((area) => (
-          <li key={area.name} className="rounded-full bg-secondary px-4 py-1 text-sm">{area.name} · {area.districts} districts</li>
+          <li key={area.name} className="rounded-full bg-secondary px-4 py-1 text-sm">
+            {area.name} · {area.districts} districts
+          </li>
         ))}
       </ul>
     </section>
@@ -2161,7 +2427,10 @@ export default function DonatePage() {
       <p className="mt-4 text-muted-foreground">{cta.description}</p>
       <p className="mt-8 rounded-lg border p-4">
         Online donations are not available yet. To support Saathi Cares, please{' '}
-        <Link href="/contact" className="underline">contact us</Link> and we will get in touch.
+        <Link href="/contact" className="underline">
+          contact us
+        </Link>{' '}
+        and we will get in touch.
       </p>
     </section>
   );
@@ -2178,7 +2447,9 @@ export default function NotFound() {
     <main className="container mx-auto px-6 py-32 text-center">
       <h1 className="font-serif text-4xl">Page not found</h1>
       <p className="mt-4 text-muted-foreground">The page you are looking for does not exist.</p>
-      <Link href="/" className="mt-8 inline-block underline">Back to home</Link>
+      <Link href="/" className="mt-8 inline-block underline">
+        Back to home
+      </Link>
     </main>
   );
 }
@@ -2189,12 +2460,22 @@ export default function NotFound() {
 ```tsx
 'use client';
 
-export default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ErrorBoundary({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   return (
     <main className="container mx-auto px-6 py-32 text-center">
       <h1 className="font-serif text-3xl">Something went wrong</h1>
       {error.digest ? <p className="mt-2 text-sm text-muted-foreground">Reference: {error.digest}</p> : null}
-      <button type="button" onClick={reset} className="mt-8 rounded-md bg-primary px-4 py-2 text-primary-foreground">
+      <button
+        type="button"
+        onClick={reset}
+        className="mt-8 rounded-md bg-primary px-4 py-2 text-primary-foreground"
+      >
         Try again
       </button>
     </main>
@@ -2207,14 +2488,22 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
 ```tsx
 'use client';
 
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   return (
     <html lang="en">
       <body>
         <main style={{ padding: '4rem', textAlign: 'center', fontFamily: 'system-ui' }}>
           <h1>Something went wrong</h1>
           {error.digest ? <p>Reference: {error.digest}</p> : null}
-          <button type="button" onClick={reset}>Try again</button>
+          <button type="button" onClick={reset}>
+            Try again
+          </button>
         </main>
       </body>
     </html>
@@ -2276,6 +2565,7 @@ Run Lighthouse once on `http://localhost:3000/` (Chrome DevTools) and record the
 ### Task 11: Documentation that matches the code
 
 **Files:**
+
 - Create: `src/server/README.md`, `docs/api/CHANGELOG.md`, `docs/internal-changelog.md`, `docs/adr/README.md`
 - Modify: `README.md`
 
@@ -2295,25 +2585,26 @@ Dental EMR and public website for Saathi Cares (SHC Foundation). Plan and decisi
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Next.js dev server on 8081 with hot reload |
-| `npm run build` / `npm run start` | Production build (standalone) and server on 3000 |
-| `npm run migrate` | Apply `src/server/db/migrations/*.sql` with the owner connection |
-| `npm run test` | Unit tests (no database) |
-| `npm run test:int` | Integration tests against `DATABASE_URL` from `.env.test` (needs `saathi_test` database) |
-| `npm run test:e2e` | Playwright smoke tests against a built app |
-| `npm run lint` / `npm run typecheck` | ESLint (with import boundaries) / `tsc` |
+| Command                              | What it does                                                                             |
+| ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `npm run dev`                        | Next.js dev server on 8081 with hot reload                                               |
+| `npm run build` / `npm run start`    | Production build (standalone) and server on 3000                                         |
+| `npm run migrate`                    | Apply `src/server/db/migrations/*.sql` with the owner connection                         |
+| `npm run test`                       | Unit tests (no database)                                                                 |
+| `npm run test:int`                   | Integration tests against `DATABASE_URL` from `.env.test` (needs `saathi_test` database) |
+| `npm run test:e2e`                   | Playwright smoke tests against a built app                                               |
+| `npm run lint` / `npm run typecheck` | ESLint (with import boundaries) / `tsc`                                                  |
 
 ## Layout
-
 ```
-app/            routes only: (public)/ pages, api/health
+
+app/ routes only: (public)/ pages, api/health
 src/components/ UI (shadcn ui/, layout/, sections/)
-src/content/    static public-site content (replaced by the CMS in Phase 4)
-src/server/     backend: config, db, http, jobs, observability, storage, health — see src/server/README.md
-e2e/            Playwright
-docs/           plan, ADRs, API changelog, reviews
+src/content/ static public-site content (replaced by the CMS in Phase 4)
+src/server/ backend: config, db, http, jobs, observability, storage, health — see src/server/README.md
+e2e/ Playwright
+docs/ plan, ADRs, API changelog, reviews
+
 ```
 
 ## What exists today (Phase 0A)
@@ -2334,16 +2625,16 @@ None. Everything in the repository is exercised by a route or a test. (PLAN.md �
 
 Everything the server does. Importable from `app/api/**`, server components, `instrumentation.ts`, and tests only (ESLint enforces it).
 
-| Directory | Responsibility | Entry points |
-| --- | --- | --- |
-| `config.ts` | Parse and validate the environment once; refuse to boot on bad config | `getConfig()`, `loadConfig()` |
-| `observability/` | pino logger with deep redaction of tier 2/3 fields; per-request context | `getLogger()`, `redactDeep()`, `runWithRequestContext()` |
-| `http/` | Error taxonomy and envelope (PLAN.md §9.4, §9.7); `withHandler` wrapper | `withHandler()`, `toErrorResponse()`, `fromPgError()` |
-| `db/` | `pg` pool + Drizzle; SQL migration runner with advisory lock | `getDb()`, `runMigrations()`, `migrate-cli.ts` |
-| `storage/` | `StorageAdapter` with the local-disk implementation (PLAN.md D20) | `getStorage()` |
-| `jobs/` | pg-boss singleton, `defineJob`, transactional `enqueue`, in-process consumer (D21) | `enqueue()`, `startConsumer()`, `stopJobs()` |
-| `health/` | Readiness checks | `checkReadiness()` |
-| `boot.ts` | Process start: config, consumer, signal handling; called from `instrumentation.ts` | `boot()` |
+| Directory        | Responsibility                                                                     | Entry points                                             |
+| ---------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `config.ts`      | Parse and validate the environment once; refuse to boot on bad config              | `getConfig()`, `loadConfig()`                            |
+| `observability/` | pino logger with deep redaction of tier 2/3 fields; per-request context            | `getLogger()`, `redactDeep()`, `runWithRequestContext()` |
+| `http/`          | Error taxonomy and envelope (PLAN.md §9.4, §9.7); `withHandler` wrapper            | `withHandler()`, `toErrorResponse()`, `fromPgError()`    |
+| `db/`            | `pg` pool + Drizzle; SQL migration runner with advisory lock                       | `getDb()`, `runMigrations()`, `migrate-cli.ts`           |
+| `storage/`       | `StorageAdapter` with the local-disk implementation (PLAN.md D20)                  | `getStorage()`                                           |
+| `jobs/`          | pg-boss singleton, `defineJob`, transactional `enqueue`, in-process consumer (D21) | `enqueue()`, `startConsumer()`, `stopJobs()`             |
+| `health/`        | Readiness checks                                                                   | `checkReadiness()`                                       |
+| `boot.ts`        | Process start: config, consumer, signal handling; called from `instrumentation.ts` | `boot()`                                                 |
 
 ## Flow trace: `GET /api/health/ready`
 
@@ -2359,8 +2650,8 @@ Everything the server does. Importable from `app/api/**`, server components, `in
 
 ## Jobs
 
-| Job | Enqueued by | Notes |
-| --- | --- | --- |
+| Job           | Enqueued by                             | Notes                                                   |
+| ------------- | --------------------------------------- | ------------------------------------------------------- |
 | `system.noop` | `src/server/jobs/boss.int.test.ts` only | Proves the queue round-trips. No product code sends it. |
 
 pg-boss creates and migrates its own `pgboss` schema on start using the runtime connection (`DATABASE_URL`). This is the one place the app role performs DDL; `infra/postgres/init.sql` (Phase 0B) grants `CREATE` on the database to `saathi_app` for that reason.
@@ -2382,6 +2673,7 @@ pg-boss creates and migrates its own `pgboss` schema on start using the runtime 
 Format: date, version, change, migration note for consumers. Breaking changes require a new path version (PLAN.md §23.2).
 
 ## Unreleased (v1)
+
 - Added `GET /api/health` and `GET /api/health/ready` (Phase 0A).
 ```
 
@@ -2393,6 +2685,7 @@ Format: date, version, change, migration note for consumers. Breaking changes re
 Service signatures, job payloads, schema migrations, JSONB document versions (PLAN.md §23.2).
 
 ## Unreleased
+
 - `withHandler(spec, fn)` introduced; `Permission` is `'public'` only until Phase 1.
 - `JobDefinition`, `enqueue(def, data, { tx })`, `system.noop` (test-only).
 - Migration `0001_init.sql`: extensions pgcrypto, citext, pg_trgm.

@@ -51,20 +51,25 @@
     --teal-500: 175 45% 35%;
     --teal-600: 175 45% 28%;
     --teal-700: 175 45% 22%;
-    
+
     --coral-50: 12 80% 97%;
     --coral-500: 12 70% 55%;
     --coral-600: 12 70% 48%;
-    
+
     --sand-50: 35 40% 97%;
     --sand-100: 35 35% 93%;
     --sand-200: 35 30% 88%;
 
     /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(175 45% 28%) 0%, hsl(175 45% 35%) 50%, hsl(180 40% 30%) 100%);
+    --gradient-hero: linear-gradient(
+      135deg,
+      hsl(175 45% 28%) 0%,
+      hsl(175 45% 35%) 50%,
+      hsl(180 40% 30%) 100%
+    );
     --gradient-warm: linear-gradient(180deg, hsl(45 30% 98%) 0%, hsl(35 30% 95%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(40 40% 99%) 0%, hsl(35 35% 97%) 100%);
-    
+
     /* Shadows */
     --shadow-soft: 0 4px 20px -4px hsl(200 25% 15% / 0.08);
     --shadow-card: 0 8px 30px -8px hsl(200 25% 15% / 0.1);
@@ -134,7 +139,12 @@
     font-family: var(--font-inter), system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-lora), Georgia, serif;
     @apply font-semibold tracking-tight;
   }

@@ -18,15 +18,11 @@ export function Team() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="text-sm font-medium text-primary uppercase tracking-wider">
-            {team.badge}
-          </span>
+          <span className="text-sm font-medium text-primary uppercase tracking-wider">{team.badge}</span>
           <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-6">
             {team.title}
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {team.description}
-          </p>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{team.description}</p>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
@@ -51,13 +47,9 @@ export function Team() {
               <h3 className="font-serif text-lg md:text-xl font-semibold text-foreground mb-2">
                 {member.name}
               </h3>
-              <p className="text-muted-foreground text-sm md:text-base mb-3">
-                {member.title}
-              </p>
-              <p className="text-sm text-muted-foreground/80 mb-4">
-                {member.credentials}
-              </p>
-              
+              <p className="text-muted-foreground text-sm md:text-base mb-3">{member.title}</p>
+              <p className="text-sm text-muted-foreground/80 mb-4">{member.credentials}</p>
+
               {member.linkedin && (
                 <a
                   href={member.linkedin}
