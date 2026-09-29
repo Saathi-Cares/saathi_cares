@@ -41,5 +41,10 @@ async function outcomeOf(check: CheckName, fn: () => Promise<void>): Promise<'ok
   }
 }
 
-/** Set by the job consumer (Task 9) once pg-boss has started. */
-export const jobsFlag = { started: false };
+const processGlobal = globalThis as typeof globalThis & { __saathiJobsFlag?: { started: boolean } };
+
+/**
+ * Set by the job consumer (Task 9) once pg-boss has started. Next bundles instrumentation.ts and the
+ * route handlers as separate module graphs in one process, so the flag lives on globalThis to be shared.
+ */
+export const jobsFlag = (processGlobal.__saathiJobsFlag ??= { started: false });
