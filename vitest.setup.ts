@@ -1,4 +1,4 @@
-import 'dotenv/config';
-// Integration tests read DATABASE_URL from .env.test when present.
 import { config } from 'dotenv';
-config({ path: '.env.test', override: false });
+// Test values always win. .env is deliberately NOT loaded: integration tests must never hit a developer database.
+config({ path: '.env.test', override: true });
+config({ path: '.env.test.local', override: true }); // machine-specific overrides, git-ignored

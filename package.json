@@ -10,7 +10,7 @@
     "dev": "next dev --port 8081",
     "build": "next build",
     "start": "next start --port 3000",
-    "build:migrate": "esbuild src/server/db/migrate-cli.ts --bundle --platform=node --target=node24 --outfile=dist/migrate.js --external:pg-native",
+    "build:migrate": "esbuild src/server/db/migrate-cli.ts --bundle --platform=node --target=node24 --format=esm --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=dist/migrate.js --external:pg-native",
     "migrate": "tsx src/server/db/migrate-cli.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
