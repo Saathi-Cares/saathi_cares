@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -91,44 +90,36 @@ export function Header() {
         </nav>
       </div>
 
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            id="mobile-menu"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-background border-t border-border"
-          >
-            <div className="px-6 py-6 space-y-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  aria-current={isActive(link.href) ? 'page' : undefined}
-                  className={cn(
-                    'block text-lg font-medium transition-colors hover:text-primary',
-                    isActive(link.href) ? 'text-primary' : 'text-foreground',
-                  )}
-                >
-                  {link.name}
-                </Link>
-              ))}
-              <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Link
-                  href="/donate"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  aria-current={isActive('/donate') ? 'page' : undefined}
-                >
-                  <Heart className="w-4 h-4 mr-2" />
-                  Donate
-                </Link>
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isMobileMenuOpen && (
+        <div id="mobile-menu" className="reveal lg:hidden bg-background border-t border-border">
+          <div className="px-6 py-6 space-y-4">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                href={link.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-current={isActive(link.href) ? 'page' : undefined}
+                className={cn(
+                  'block text-lg font-medium transition-colors hover:text-primary',
+                  isActive(link.href) ? 'text-primary' : 'text-foreground',
+                )}
+              >
+                {link.name}
+              </Link>
+            ))}
+            <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Link
+                href="/donate"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-current={isActive('/donate') ? 'page' : undefined}
+              >
+                <Heart className="w-4 h-4 mr-2" />
+                Donate
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

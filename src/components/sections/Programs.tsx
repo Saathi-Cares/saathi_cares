@@ -1,7 +1,3 @@
-'use client';
-
-import { motion, useInView } from 'framer-motion';
-import { useRef } from 'react';
 import { BookOpen, GraduationCap, Heart, Sparkles, Stethoscope, Users, type LucideIcon } from 'lucide-react';
 import type { ProgramsContent } from '@/content/site';
 
@@ -14,24 +10,16 @@ const colorStyles = {
 };
 
 export function Programs({ content }: { content: ProgramsContent }) {
-  const ref = useRef<HTMLElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
-
   return (
-    <section id="programs" className="section-padding bg-secondary" ref={ref}>
+    <section id="programs" className="section-padding bg-secondary">
       <div className="container-wide mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
+        <div className="reveal text-center mb-16">
           <span className="text-sm font-medium text-primary uppercase tracking-wider">{content.badge}</span>
           <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-6">
             {content.title}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{content.description}</p>
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8">
           {content.programs.map((program, index) => {
@@ -39,12 +27,10 @@ export function Programs({ content }: { content: ProgramsContent }) {
             const styles = colorStyles[color];
             const Icon = iconMap[program.icon] ?? Heart;
             return (
-              <motion.div
+              <div
                 key={program.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.6, delay: 0.1 * index }}
-                className={`${styles.bg} rounded-xl p-8 group hover:shadow-elevated transition-all duration-300`}
+                className={`reveal ${styles.bg} rounded-xl p-8 group hover:shadow-elevated transition-all duration-300`}
+                style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className="flex items-start gap-5">
                   <div
@@ -67,7 +53,7 @@ export function Programs({ content }: { content: ProgramsContent }) {
                     )}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>

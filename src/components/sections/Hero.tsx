@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import type { HeroContent } from '@/content/site';
 import heroImage from '@/assets/hero-dental-camp.jpg';
 
-// Server component. The entrance animation is CSS (tailwindcss-animate) rather than framer-motion so the
-// hero paints with the HTML instead of waiting for hydration. The heading and paragraph slide in without
+// Server component. The entrance animation is CSS (tailwindcss-animate), so the hero paints with the
+// HTML instead of waiting for hydration. The heading and paragraph slide in without
 // fading: the paragraph is the page's LCP element, and Chrome drops LCP candidates first painted at opacity 0.
 const slideIn = 'animate-in slide-in-from-bottom-5 duration-700 fill-mode-both motion-reduce:animate-none';
 const enter = `${slideIn} fade-in`;

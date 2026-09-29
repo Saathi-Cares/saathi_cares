@@ -1,47 +1,32 @@
-'use client';
-
-import { motion, useInView } from 'framer-motion';
-import { useRef } from 'react';
 import { Eye, Target } from 'lucide-react';
 import type { AboutContent } from '@/content/site';
 
 export function About({ content }: { content: AboutContent }) {
-  const ref = useRef<HTMLElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
-
   return (
-    <section id="about" className="section-padding" ref={ref}>
+    <section id="about" className="section-padding">
       <div className="container-wide mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6 }}
-            >
+            <div className="reveal">
               <span className="text-sm font-medium text-primary uppercase tracking-wider">
                 {content.badge}
               </span>
               <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-8">
                 {content.title}
               </h2>
-            </motion.div>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-lg text-muted-foreground leading-relaxed mb-8"
+            </div>
+            <p
+              className="reveal text-lg text-muted-foreground leading-relaxed mb-8"
+              style={{ animationDelay: '100ms' }}
             >
               {content.description}
-            </motion.p>
+            </p>
           </div>
 
           <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={isInView ? { opacity: 1, x: 0 } : {}}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="bg-teal-50 rounded-xl p-8 border-l-4 border-primary"
+            <div
+              className="reveal bg-teal-50 rounded-xl p-8 border-l-4 border-primary"
+              style={{ animationDelay: '200ms' }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
@@ -50,13 +35,11 @@ export function About({ content }: { content: AboutContent }) {
                 <h3 className="font-serif text-xl font-semibold text-foreground">Our Vision</h3>
               </div>
               <p className="text-muted-foreground leading-relaxed">{content.vision}</p>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={isInView ? { opacity: 1, x: 0 } : {}}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="bg-coral-50 rounded-xl p-8 border-l-4 border-accent"
+            <div
+              className="reveal bg-coral-50 rounded-xl p-8 border-l-4 border-accent"
+              style={{ animationDelay: '300ms' }}
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
@@ -65,7 +48,7 @@ export function About({ content }: { content: AboutContent }) {
                 <h3 className="font-serif text-xl font-semibold text-foreground">Our Mission</h3>
               </div>
               <p className="text-muted-foreground leading-relaxed">{content.mission}</p>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
