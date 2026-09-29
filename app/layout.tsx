@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: 'Saathi Cares | Taking Oral Healthcare to the Last Mile', template: '%s | Saathi Cares' },
   description:
-    'Saathi Cares by SHC Foundation provides free dental camps, school oral health programs, and community outreach to underserved communities across India.',
+    'Saathi Cares by SHC Foundation provides free dental camps, school oral health programs, and community outreach to underserved communities across India. Join our mission for oral health equity.',
   authors: [{ name: 'SHC Foundation (Saathi Ventures)' }],
   keywords: [
     'oral health',
@@ -31,7 +31,10 @@ export const metadata: Metadata = {
     'India',
     'Saathi Ventures',
     'SHC Foundation',
+    'community health',
+    'rural healthcare',
     'dental camps',
+    'free dental checkup',
   ],
   alternates: { canonical: siteUrl },
   openGraph: {

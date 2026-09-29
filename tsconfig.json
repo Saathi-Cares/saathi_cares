@@ -20,13 +20,5 @@
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".next",
-    "e2e",
-    // removed in Task 10
-    "src/components/sections",
-    "src/components/layout"
-  ]
+  "exclude": ["node_modules", "dist", ".next", "e2e"]
 }

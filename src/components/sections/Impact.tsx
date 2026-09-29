@@ -1,14 +1,13 @@
+'use client';
+
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { MapPin, Users, Heart, Smile } from 'lucide-react';
-import { useCMS } from '@/hooks/useCMS';
+import { Heart } from 'lucide-react';
+import type { ImpactContent } from '@/content/site';
 
-const iconMap: Record<string, any> = { MapPin, Users, Heart, Smile };
-
-export function Impact() {
-  const ref = useRef(null);
+export function Impact({ content }: { content: ImpactContent }) {
+  const ref = useRef<HTMLElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
-  const { impact } = useCMS();
 
   return (
     <section id="impact" className="section-padding gradient-hero text-primary-foreground" ref={ref}>
@@ -20,14 +19,14 @@ export function Impact() {
           className="text-center mb-16"
         >
           <span className="text-sm font-medium text-primary-foreground/80 uppercase tracking-wider">
-            {impact.badge}
+            {content.badge}
           </span>
-          <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl mt-3 mb-6">{impact.title}</h2>
-          <p className="text-lg text-primary-foreground/80 max-w-2xl mx-auto">{impact.description}</p>
+          <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl mt-3 mb-6">{content.title}</h2>
+          <p className="text-lg text-primary-foreground/80 max-w-2xl mx-auto">{content.description}</p>
         </motion.div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {impact.stats.map((stat, index) => (
+          {content.stats.map((stat, index) => (
             <motion.div
               key={stat.id}
               initial={{ opacity: 0, y: 20 }}

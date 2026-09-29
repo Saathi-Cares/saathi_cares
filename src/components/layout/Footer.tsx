@@ -1,5 +1,13 @@
 import { Heart, Mail, MapPin } from 'lucide-react';
-import { motion } from 'framer-motion';
+import Link from 'next/link';
+
+const quickLinks = [
+  { name: 'About Us', href: '/#about' },
+  { name: 'Our Programs', href: '/#programs' },
+  { name: 'Impact', href: '/#impact' },
+  { name: 'Team', href: '/#team' },
+  { name: 'Contact', href: '/contact' },
+];
 
 export function Footer() {
   return (
@@ -25,16 +33,16 @@ export function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-serif font-semibold text-lg mb-4">Quick Links</h4>
+            <h2 className="font-serif font-semibold text-lg mb-4">Quick Links</h2>
             <ul className="space-y-3">
-              {['About Us', 'Our Programs', 'Impact Stories', 'Team', 'Contact'].map((link) => (
-                <li key={link}>
-                  <a
-                    href={`#${link.toLowerCase().replace(' ', '-')}`}
+              {quickLinks.map((link) => (
+                <li key={link.name}>
+                  <Link
+                    href={link.href}
                     className="text-primary-foreground/80 hover:text-primary-foreground transition-colors"
                   >
-                    {link}
-                  </a>
+                    {link.name}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -42,17 +50,17 @@ export function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="font-serif font-semibold text-lg mb-4">Contact</h4>
+            <h2 className="font-serif font-semibold text-lg mb-4">Contact</h2>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 mt-0.5 shrink-0 opacity-80" />
                 <span className="text-primary-foreground/80">Delhi, Haryana, Uttar Pradesh, India</span>
               </li>
               <li className="flex items-center gap-3">
-                <Mail className="w-5 h-5 opacity-80" />
+                <Mail className="w-5 h-5 shrink-0 opacity-80" />
                 <a
                   href="mailto:cares@saathiventures.com"
-                  className="text-primary-foreground/80 hover:text-primary-foreground transition-colors"
+                  className="text-primary-foreground/80 hover:text-primary-foreground transition-colors break-all"
                 >
                   cares@saathiventures.com
                 </a>
@@ -100,31 +108,26 @@ export function Footer() {
                 </svg>
               ),
             },
-          ].map((social, index) => (
-            <motion.a
+          ].map((social) => (
+            <a
               key={social.name}
               href={social.href}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Follow us on ${social.name}`}
-              className="w-10 h-10 rounded-full bg-primary-foreground/10 flex items-center justify-center text-primary-foreground/80 hover:bg-primary-foreground hover:text-primary transition-all duration-300"
-              whileHover={{ scale: 1.15, rotate: 5 }}
-              whileTap={{ scale: 0.95 }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 * index }}
+              className="w-10 h-10 rounded-full bg-primary-foreground/10 flex items-center justify-center text-primary-foreground/80 hover:bg-primary-foreground hover:text-primary hover:scale-110 hover:rotate-3 active:scale-95 transition-all duration-300"
             >
               {social.icon}
-            </motion.a>
+            </a>
           ))}
         </div>
 
         {/* Bottom Bar */}
         <div className="border-t border-primary-foreground/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-primary-foreground/60">
+          <p className="text-sm text-primary-foreground/80">
             © {new Date().getFullYear()} Saathi Cares. All rights reserved.
           </p>
-          <p className="text-sm text-primary-foreground/60">A Saathi Ventures Initiative</p>
+          <p className="text-sm text-primary-foreground/80">A Saathi Ventures Initiative</p>
         </div>
       </div>
     </footer>

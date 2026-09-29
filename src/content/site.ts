@@ -1,4 +1,7 @@
-// CMS Content Storage using localStorage
+/**
+ * Static site content for the public pages until the CMS (PLAN.md Phase 4) replaces it.
+ * Editing this file and redeploying is currently the only way to change public copy.
+ */
 
 export interface HeroContent {
   badge: string;
@@ -90,7 +93,7 @@ export interface CTAContent {
   secondaryCta: string;
 }
 
-export interface CMSContent {
+export interface SiteContent {
   hero: HeroContent;
   about: AboutContent;
   programs: ProgramsContent;
@@ -100,9 +103,7 @@ export interface CMSContent {
   cta: CTAContent;
 }
 
-const CMS_KEY = 'saathi_cms_content';
-
-const defaultContent: CMSContent = {
+export const siteContent: SiteContent = {
   hero: {
     badge: 'Taking Oral Healthcare to the Last Mile',
     title: 'Healthy Smiles for',
@@ -255,29 +256,3 @@ const defaultContent: CMSContent = {
     secondaryCta: 'Become a Partner',
   },
 };
-
-export function getCMSContent(): CMSContent {
-  try {
-    const data = localStorage.getItem(CMS_KEY);
-    if (data) {
-      return { ...defaultContent, ...JSON.parse(data) };
-    }
-    return defaultContent;
-  } catch {
-    return defaultContent;
-  }
-}
-
-export function saveCMSContent(content: Partial<CMSContent>): void {
-  const current = getCMSContent();
-  const updated = { ...current, ...content };
-  localStorage.setItem(CMS_KEY, JSON.stringify(updated));
-}
-
-export function resetCMSContent(): void {
-  localStorage.removeItem(CMS_KEY);
-}
-
-export function getDefaultContent(): CMSContent {
-  return defaultContent;
-}

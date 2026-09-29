@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion';
-import { useInView } from 'framer-motion';
+'use client';
+
+import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { AlertCircle, Users, Globe, Skull } from 'lucide-react';
 
@@ -27,7 +28,7 @@ const stats = [
 ];
 
 export function Problem() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
 
   return (
@@ -74,8 +75,8 @@ export function Problem() {
           className="mt-12 bg-coral-50 rounded-xl p-8 md:p-12 text-center"
         >
           <p className="text-lg md:text-xl text-foreground italic max-w-3xl mx-auto">
-            "Injustice anywhere is a threat to justice everywhere. We are caught in an inescapable network of
-            mutuality, tied in a single garment of destiny."
+            &ldquo;Injustice anywhere is a threat to justice everywhere. We are caught in an inescapable
+            network of mutuality, tied in a single garment of destiny.&rdquo;
           </p>
           <p className="text-sm font-medium text-muted-foreground mt-4">— Martin Luther King Jr.</p>
         </motion.div>

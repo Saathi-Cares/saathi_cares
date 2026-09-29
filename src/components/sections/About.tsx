@@ -1,12 +1,13 @@
+'use client';
+
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Eye, Target, Heart } from 'lucide-react';
-import { useCMS } from '@/hooks/useCMS';
+import { Eye, Target } from 'lucide-react';
+import type { AboutContent } from '@/content/site';
 
-export function About() {
-  const ref = useRef(null);
+export function About({ content }: { content: AboutContent }) {
+  const ref = useRef<HTMLElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
-  const { about } = useCMS();
 
   return (
     <section id="about" className="section-padding" ref={ref}>
@@ -18,9 +19,11 @@ export function About() {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6 }}
             >
-              <span className="text-sm font-medium text-primary uppercase tracking-wider">{about.badge}</span>
+              <span className="text-sm font-medium text-primary uppercase tracking-wider">
+                {content.badge}
+              </span>
               <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-8">
-                {about.title}
+                {content.title}
               </h2>
             </motion.div>
             <motion.p
@@ -29,7 +32,7 @@ export function About() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-lg text-muted-foreground leading-relaxed mb-8"
             >
-              {about.description}
+              {content.description}
             </motion.p>
           </div>
 
@@ -46,7 +49,7 @@ export function About() {
                 </div>
                 <h3 className="font-serif text-xl font-semibold text-foreground">Our Vision</h3>
               </div>
-              <p className="text-muted-foreground leading-relaxed">{about.vision}</p>
+              <p className="text-muted-foreground leading-relaxed">{content.vision}</p>
             </motion.div>
 
             <motion.div
@@ -61,7 +64,7 @@ export function About() {
                 </div>
                 <h3 className="font-serif text-xl font-semibold text-foreground">Our Mission</h3>
               </div>
-              <p className="text-muted-foreground leading-relaxed">{about.mission}</p>
+              <p className="text-muted-foreground leading-relaxed">{content.mission}</p>
             </motion.div>
           </div>
         </div>

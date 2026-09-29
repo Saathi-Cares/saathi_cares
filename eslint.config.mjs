@@ -4,8 +4,6 @@ import nextTs from 'eslint-config-next/typescript';
 
 export default defineConfig([
   globalIgnores(['.next/**', 'dist/**', 'node_modules/**', 'playwright-report/**', 'test-results/**']),
-  // temporary: repaired and re-included in Task 10
-  globalIgnores(['src/components/sections/**', 'src/components/layout/**']),
   ...nextVitals,
   ...nextTs,
   {

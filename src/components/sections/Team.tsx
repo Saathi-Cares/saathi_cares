@@ -1,13 +1,13 @@
-import { motion } from 'framer-motion';
-import { useInView } from 'framer-motion';
+'use client';
+
+import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { Linkedin } from 'lucide-react';
-import { useCMS } from '@/hooks/useCMS';
+import type { TeamContent } from '@/content/site';
 
-export function Team() {
-  const ref = useRef(null);
+export function Team({ content }: { content: TeamContent }) {
+  const ref = useRef<HTMLElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-100px' });
-  const { team } = useCMS();
 
   return (
     <section id="team" className="section-padding" ref={ref}>
@@ -18,15 +18,15 @@ export function Team() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="text-sm font-medium text-primary uppercase tracking-wider">{team.badge}</span>
+          <span className="text-sm font-medium text-primary uppercase tracking-wider">{content.badge}</span>
           <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-6">
-            {team.title}
+            {content.title}
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{team.description}</p>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{content.description}</p>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
-          {team.members.map((member, index) => (
+          {content.members.map((member, index) => (
             <motion.div
               key={member.id}
               initial={{ opacity: 0, y: 20 }}
