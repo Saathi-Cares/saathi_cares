@@ -1,9 +1,13 @@
 import 'server-only';
 import { getConfig } from '../config';
 import { getPool } from '../db/client';
+import { getLogger } from '../observability/logger';
 import { getStorage } from '../storage';
 
-export type Readiness = { ok: boolean; checks: Record<'database' | 'storage' | 'jobs', 'ok' | string> };
+type CheckName = 'database' | 'storage' | 'jobs';
+type CheckOutcome = 'ok' | 'failed' | 'not started';
+
+export type Readiness = { ok: boolean; checks: Record<CheckName, CheckOutcome> };
 
 type Deps = {
   pingDatabase?: () => Promise<void>;
@@ -17,18 +21,23 @@ export async function checkReadiness(deps: Deps = {}): Promise<Readiness> {
   const probeStorage = deps.probeStorage ?? (() => getStorage().probeWritable());
   const jobsStarted = deps.jobsStarted ?? (() => !cfg.jobsEnabled || jobsFlag.started);
 
-  const [database, storage] = await Promise.all([outcomeOf(pingDatabase), outcomeOf(probeStorage)]);
-  const jobs = jobsStarted() ? 'ok' : 'not started';
+  const [database, storage] = await Promise.all([
+    outcomeOf('database', pingDatabase),
+    outcomeOf('storage', probeStorage),
+  ]);
+  const jobs: CheckOutcome = jobsStarted() ? 'ok' : 'not started';
   const checks = { database, storage, jobs };
   return { ok: Object.values(checks).every((v) => v === 'ok'), checks };
 }
 
-async function outcomeOf(fn: () => Promise<void>): Promise<'ok' | string> {
+/** The endpoint is public (Nginx in 0B), so failure detail goes to the log, never the body. */
+async function outcomeOf(check: CheckName, fn: () => Promise<void>): Promise<'ok' | 'failed'> {
   try {
     await fn();
     return 'ok';
   } catch (err) {
-    return (err as Error).message.slice(0, 200);
+    getLogger().warn({ check, err }, 'readiness check failed');
+    return 'failed';
   }
 }
 

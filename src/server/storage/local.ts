@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { ExternalServiceError, ValidationError } from '../http/errors';
+import { ExternalServiceError, NotFoundError, ValidationError } from '../http/errors';
 import type { PutResult, StorageAdapter } from './adapter';
 
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
@@ -49,7 +49,14 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async get(key: string): Promise<NodeJS.ReadableStream> {
-    return createReadStream(this.resolve(key));
+    const full = this.resolve(key);
+    try {
+      await fs.access(full);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw new NotFoundError('File');
+      throw err;
+    }
+    return createReadStream(full);
   }
 
   async exists(key: string): Promise<boolean> {

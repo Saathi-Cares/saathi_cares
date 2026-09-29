@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { NotFoundError } from '../http/errors';
 import { LocalStorageAdapter } from './local';
 
 let root: string;
@@ -25,6 +26,10 @@ describe('LocalStorageAdapter', () => {
     expect(await storage.exists('private/a/b.txt')).toBe(true);
     await storage.delete('private/a/b.txt');
     expect(await storage.exists('private/a/b.txt')).toBe(false);
+  });
+
+  it('get rejects with NotFoundError for a missing key', async () => {
+    await expect(storage.get('private/missing.txt')).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('accepts a stream', async () => {
