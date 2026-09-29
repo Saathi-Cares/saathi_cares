@@ -89,7 +89,7 @@ Replace the `scripts` block and add `engines`:
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run --exclude \"**/*.int.test.ts\"",
-    "test:int": "vitest run --dir src --testNamePattern \".*\" --include \"**/*.int.test.ts\"",
+    "test:int": "vitest run int.test",
     "test:e2e": "playwright test",
     "test:all": "npm run test && npm run test:int"
   }
