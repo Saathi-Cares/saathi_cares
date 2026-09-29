@@ -86,4 +86,37 @@ describe('redactDeep', () => {
     expect(out.cause.message).toBe('boom');
     expect(typeof out.cause.stack).toBe('string');
   });
+
+  it('replaces values nested deeper than the depth limit', () => {
+    let chain: Record<string, unknown> = { leaf: true };
+    for (let i = 0; i < 40; i++) chain = { next: chain };
+    let node: unknown = redactDeep(chain);
+    for (let level = 0; level <= 32; level++) {
+      expect(typeof node).toBe('object');
+      expect(Object.keys(node as object)).toEqual(['next']);
+      node = (node as { next: unknown }).next;
+    }
+    expect(node).toBe('[depth limit]');
+  });
+
+  it('truncates once the node budget is exhausted', () => {
+    const wide = { items: Array.from({ length: 30_000 }, (_, i) => ({ i })) };
+    const start = performance.now();
+    const out = redactDeep(wide);
+    const ms = performance.now() - start;
+    expect(JSON.stringify(out)).toContain('"[truncated]"');
+    expect(ms).toBeLessThan(1000);
+  });
+
+  it('bounds an exponentially shared graph and leaks nothing', () => {
+    let node: Record<string, unknown> = { phone: 'x' };
+    for (let i = 0; i < 40; i++) node = { a: node, b: node };
+    const start = performance.now();
+    const out = redactDeep(node);
+    const ms = performance.now() - start;
+    expect(ms).toBeLessThan(1000);
+    const json = JSON.stringify(out);
+    expect(json).toContain('"[truncated]"');
+    expect(json).not.toContain('"x"');
+  });
 });
