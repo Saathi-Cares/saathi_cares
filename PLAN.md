@@ -1,6 +1,6 @@
 # SaathiCares Digital Platform — Architecture and Delivery Plan
 
-Status: **draft for review, revision 4** (clinical model rewritten; simplified after the three-model council review in §22; product owner's answers applied in §20.1; oral cancer and tobacco cessation programmes, AI screening phase and engineering standards added 2026-09-29) · Author: Abhinav Goyal with Claude · First draft 2026-09-28, revised 2026-09-29 · Supersedes: `ARCHITECTURE_AUDIT.md` §12 (next steps)
+Status: **draft for review, revision 5** (clinical model rewritten; simplified after the three-model council review in §22; product owner's answers applied in §20.1; oral cancer and tobacco cessation programmes, AI screening phase and engineering standards added 2026-09-29; patient engagement — AI intake call and WhatsApp reminders — added as Phase 6 on the founder's request, 2026-09-29) · Author: Abhinav Goyal with Claude · First draft 2026-09-28, revised 2026-09-29 · Supersedes: `ARCHITECTURE_AUDIT.md` §12 (next steps)
 
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
@@ -46,6 +46,7 @@ SaathiCares (SHC Foundation) runs free dental camps in villages and tier-2/3 cit
 1. **The public website**, editable by staff without a developer (CMS), with a contact form and, later, online donations.
 2. **The operational system** for camps and clinics, a dental EMR shaped for camp work: one patient record that follows a person from camp registration → screening → dentist review → referral → clinic → treatment → outcome, with AI-assisted screening of intra-oral photographs and two programme pathways that run alongside dental care: **oral cancer screening and surveillance**, and **tobacco cessation counselling**.
 3. **The admin surface** where staff see everything their role permits: content, enquiries, patients, camps, programmes, donations, users, reports, audit trail.
+4. **Patient-facing engagement** (added 2026-09-29 at the founder's request): a patient can phone the organisation and an AI voice agent captures their details and complaint as a pre-registration draft that the volunteer and dentist confirm at the camp; after a consultation the patient receives WhatsApp reminders for medication, appointments and follow-ups and can reply to reschedule. Both are bounded by D28 and D29.
 
 Success looks like: a volunteer registers a patient with photos on their phone at a camp; a dentist reviews it that evening from a laptop and refers; the clinic dentist opens the same record, images included, a week later; the founder sees the camp-to-clinic conversion on a dashboard; and none of that data ever lives only in one browser.
 
@@ -54,7 +55,7 @@ Success looks like: a volunteer registers a patient with photos on their phone a
 | Constraint | Consequence |
 | --- | --- |
 | Non-profit, minimal recurring budget | One small VPS to start. No managed services with per-seat or per-request pricing. Every component must run on that box. |
-| Everything open source | All software is OSI-licensed and self-hostable. Third parties are limited to things that *cannot* be self-hosted: the payment gateway, the SMTP relay, DNS. |
+| Everything open source | All software is OSI-licensed and self-hostable. Third parties are limited to things that *cannot* be self-hosted: the payment gateway, the SMTP relay, DNS, and (from Phase 6) the telephone line and the WhatsApp Business Platform, which are carrier services with per-call and per-conversation charges the owner must approve. |
 | One developer, part-time | Modular monolith, one deployable, boring tools with long support lives. No Kubernetes, no service mesh, no bespoke infra. |
 | Patient health data and donor money | Server-side enforcement of every permission, append-only audit log, encrypted backups, no PHI in logs, MFA for privileged roles. |
 | Field use on volunteers' own phones and tablets over mobile data | Mobile-first responsive web app (360 px phones are the primary design target, tablets and laptops second), autosaved drafts, idempotent submissions that survive retries. Offline mode is out of scope: camps have mobile data (§20). |
@@ -181,6 +182,7 @@ Each module under `src/server/modules/<name>/` owns its tables, its service func
 | `communications` | log of phone calls and in-person notices to patients; channel adapters (SMS/WhatsApp) are parked and not built | `patients`, `audit` |
 | `programmes` | oral cancer surveillance (lesion assessments, biopsy referrals, surveillance schedule) and tobacco cessation (enrolments, counselling sessions, quit status) | `patients`, `encounters`, `referrals`, `communications`, `audit` |
 | `ai_screening` | calls the inference service for a completed image set, stores `screening_results` rows with model name and version, tracks model registry and evaluation metrics | `encounters`, `media`, `jobs`, `audit` |
+| `patient_engagement` | AI intake calls and pre-registration drafts (never clinical records until a volunteer confirms them); WhatsApp reminders generated from prescriptions and follow-ups; inbound replies to tasks; provider adapters for telephony and WhatsApp | `patients`, `encounters`, `communications`, `media`, `jobs`, `audit` |
 | `donations` | campaigns, donors, donations, payment orders, gateway events, receipts, reconciliation | `notifications`, `jobs`, `audit` |
 | `reports` | read-only aggregations and exports | read access to all, no writes |
 | `audit` | append-only audit log | — |
@@ -217,7 +219,10 @@ All licences are permissive open source unless marked. "Why" is the deciding rea
 | Backups | `pg_dump` every 6 h + media directory → restic (encrypted) repository on a separate volume of the VPS, mirrored to the developer's machine whenever it is online; pgBackRest WAL archiving when the database exceeds 5 GB | — | There is no backup host yet. The on-VPS repository covers application and database corruption; the developer-machine mirror covers loss of the VPS. Restore is tested monthly on the VPS in a throwaway container. Accepted risk recorded in D24. |
 | CI/CD | GitHub Actions → GHCR image → SSH deploy; trunk-based | — | Free for this repo size; no deploy platform lock-in. |
 | Testing | Vitest (unit + integration against a GitHub Actions Postgres service), Playwright smoke on push and full nightly | — | Same coverage as Testcontainers with less library surface; k6 and OpenAPI generation cut (§22). |
-| Payments | Razorpay (default; final choice in Phase 7 after fee comparison, parked until the organisation asks) | — | Indian UPI/cards/netbanking, webhooks with HMAC signatures. Not open source; unavoidable. |
+| Telephony (Phase 6) | An Indian phone number on a SIP trunk terminated by self-hosted FreeSWITCH or Asterisk, or a cloud telephony API if the SIP route proves impractical; decided in Phase 6 after a cost and reliability comparison (§20.2) | Phase 6 | The line itself is a carrier service and cannot be self-hosted; the voice pipeline behind it can be. |
+| Speech and language (Phase 6) | Self-hosted speech-to-text (Whisper-class model, Hindi and English), a self-hosted small language model for slot-filling the pre-registration fields, self-hosted text-to-speech; runs in its own container behind an internal versioned API like `ai-inference` | Phase 6 | Keeps recordings and transcripts on the platform's hosts (§8.9). CPU inference is slow for live speech; Phase 6 measures and may need the GPU host in §19. |
+| WhatsApp (Phase 6) | WhatsApp Business Platform through a Meta business solution provider; template messages only | Phase 6 | The only way to send WhatsApp messages lawfully at scale; per-conversation pricing is a §20.2 question. |
+| Payments | Razorpay (default; final choice in Phase 8 after fee comparison, parked until the organisation asks) | — | Indian UPI/cards/netbanking, webhooks with HMAC signatures. Not open source; unavoidable. |
 | Edge (optional) | Cloudflare free tier | — | Not open source, but free and removable. Provides CDN/DDoS/WAF we could not otherwise afford. Reviewer decision (§20). |
 
 ---
@@ -303,6 +308,12 @@ The organisation has no technical staff and the developer may hand the platform 
 
 **D27. Clinic operations in v1 means clinical continuity, scheduling and outcomes, not practice management.**
 "Clinic operations" in the organisation's description is read as: referred and walk-in patients handled with full context, a day schedule built from scheduled referrals and due follow-ups, treatments and prescriptions recorded, outcomes tracked. Billing, inventory and staff rostering are out of scope (treatment is free) and are a §20 question if that reading is wrong.
+
+**D28. An AI intake call produces a draft, never a record.**
+Context: the founder wants patients to phone in and have an AI agent capture their information so they need not repeat it at the camp. The vendor demo the owner shared recorded an age of 35 as "Take five" and a gender as "Nail", which is what speech recognition does with Indian names, accents and phone lines. Decision: everything captured on a call lands in `pre_registrations` as a draft with per-field confidence; a draft becomes part of a patient's record only when a volunteer confirms each field face to face at the camp, and the audit trail records which fields came from the call and who confirmed them. The call is recorded only after the caller hears and accepts a consent prompt; the caller can reach a human (voicemail task) at any point. Speech-to-text, classification and text-to-speech run on the platform's own hosts (§8.9); only the telephone line is external. Rejected: writing call data straight into the patient record (unsafe), sending audio to an external transcription API (contradicts self-hosting and consent), and building this before Phases 2–3 exist (there would be nothing to pre-fill).
+
+**D29. WhatsApp reminders repeat what the dentist recorded, and only with consent.**
+Context: the founder wants post-consultation reminders (ointment three times a day, medication, appointments, rebooking) on WhatsApp. This partially supersedes D23's "no patient messaging": WhatsApp becomes the first outbound channel. Decision: reminders are generated only from a dentist's prescription entries and from scheduled follow-ups and appointments; the system composes no clinical advice; every message is a pre-approved template; sending requires a recorded `contact_whatsapp` consent and stops on a "STOP" reply; inbound "reschedule" replies create a task for a person, they do not change the schedule automatically; every send, delivery and reply is a `patient_communications` row. The WhatsApp Business Platform and its provider are paid external services accepted like the payment gateway. Rejected: free-form generated messages, unofficial WhatsApp automation (account bans, no consent trail), and SMS as the first channel (the founder asked for WhatsApp; SMS stays parked).
 
 **D22. Financial year receipt numbering is gap-free by construction.**
 Postgres sequences skip on rollback, and 80G receipts are expected to be sequential within the Indian financial year (April–March). Decision: a `receipt_counters` row per financial year, incremented under row lock inside the same transaction that marks the donation succeeded. See §8.6.
@@ -609,7 +620,7 @@ screening_results        -- every automated or human preliminary read of a scree
   idx: (screening_id, source, produced_at desc)
 ```
 
-AI screening is **schema-ready, not built** in v1: an `ai_model` result row is produced by a job when a model is integrated (backlog, §18 Phase 7). Until then, results come from the volunteer checklist. The dentist review below is the only clinically authoritative record; a screening result never drives a decision on its own.
+AI screening is **schema-ready, not built** in v1: an `ai_model` result row is produced by a job when a model is integrated (§18 Phase 5). Until then, results come from the volunteer checklist. The dentist review below is the only clinically authoritative record; a screening result never drives a decision on its own.
 
 #### 8.5.6 Dentist review, findings, diagnosis, treatment, prescription
 
@@ -745,6 +756,39 @@ labels           -- the training data, derived, never hand-edited: (screening_im
 
 The training pipeline (`ai/` in the repo: Python scripts, not part of the web image) exports de-identified images and labels for internal training only, records the dataset hash in the model manifest, and produces the validation report the dentist signs. No image leaves the platform for training (§8.9 rule 8).
 
+#### 8.5.11 Patient engagement: AI intake calls and WhatsApp reminders (Phase 6; D28, D29)
+
+```
+intake_calls
+  id, caller_phone text (normalised E.164), started_at, ended_at, language ('hi','en','mixed'), consent_given bool, consent_at,
+  recording_media_id fk null (private; only if consent_given), transcript text null, status ('in_progress','completed','abandoned','human_requested','no_consent'),
+  provider_call_id text unique, pre_registration_id fk null, notes
+  idx: (caller_phone, started_at desc), (status)
+
+pre_registrations        -- the structured draft produced from a call; never the record (D28)
+  id, intake_call_id fk unique, caller_phone, patient_id fk null (set when matched or created at the camp),
+  fields jsonb ({ full_name: {value, confidence}, age_years: {...}, gender: {...}, village_or_area: {...}, chief_complaint: {...}, duration: {...},
+                  dental_history: {...}, tobacco_use: {...}, medical_conditions: {...}, medications: {...}, allergies: {...} }),
+  model_name, model_version, produced_at,
+  status ('draft','confirmed','partially_confirmed','discarded','expired'), reviewed_by fk users null, reviewed_at null,
+  confirmation jsonb null ({ field: 'confirmed'|'corrected'|'discarded' })   -- audit of what the volunteer did per field
+  idx: (caller_phone, status), (status, produced_at)
+
+patient_reminders
+  id, patient_id fk, consent_id fk (contact_whatsapp), source_type ('prescription','follow_up','referral_appointment'), source_id,
+  kind ('medication','ointment','appointment','follow_up'), template text, params jsonb, times_of_day time[] , starts_on date, ends_on date,
+  quiet_hours jsonb, status ('active','completed','stopped','failed'), created_by fk users, created_at
+  idx: (patient_id, status), (status, starts_on)
+reminder_deliveries      -- one row per scheduled send; the job dispatches due rows
+  id, reminder_id fk, due_at, sent_at null, communication_id fk null, provider_message_id null, status ('due','sent','delivered','read','failed','skipped')
+  idx: (status, due_at)
+inbound_messages         -- WhatsApp replies
+  id, patient_id fk null, from_phone, received_at, body text, classified_as ('stop','reschedule','rebook','confirm','other'),
+  task_id null, communication_id fk
+```
+
+`patient_communications.channel` gains `'whatsapp'` as a live channel in Phase 6; `consents.type` gains `'call_recording'`. The camp registration form (Phase 2) reads `pre_registrations` by phone number and pre-fills with "from call, please confirm" markers.
+
 ### 8.6 Donations and payments (schema fixed now, built in Phase 4)
 
 ```
@@ -765,7 +809,7 @@ donation_receipts  id, donation_id fk unique, pdf_media_id fk, emailed_at
 
 `donations` and `payment_events`: the application database role has no `UPDATE` beyond status columns and no `DELETE`. Refunds are status changes plus a new `payment_events` row, never edits of amounts.
 
-Statutory exports the schema must support: the **Form 10BD** annual statement of donations (donor name, address, PAN or other id, amount, mode, section) due each 31 May, and the matching Form 10BE certificates to donors. Both are generated from `donations` joined to `donors` for the financial year by a permissioned export (§13.1) and are a Phase 7 deliverable.
+Statutory exports the schema must support: the **Form 10BD** annual statement of donations (donor name, address, PAN or other id, amount, mode, section) due each 31 May, and the matching Form 10BE certificates to donors. Both are generated from `donations` joined to `donors` for the financial year by a permissioned export (§13.1) and are a Phase 8 deliverable.
 
 ### 8.7 Jobs and notifications
 
@@ -833,7 +877,8 @@ Authentication and authorisation say *who* may act. This section says *what* the
 | 3 (programmes) | `POST /reviews/:id/lesion-assessments`, `GET /lesion-assessments?status=`, `PATCH /lesion-assessments/:id`, `POST /lesion-assessments/:id/biopsy-result`; `POST /patients/:id/enrolments`, `GET /enrolments?programme=&status=&counsellor=`, `PATCH /enrolments/:id`, `POST /enrolments/:id/status`; `GET /cessation-sessions/worklist`, `POST /enrolments/:id/sessions`, `PATCH /cessation-sessions/:id`, `POST /cessation-sessions/:id/hold` |
 | 5 (AI) | `GET /ai/models`, `POST /ai/models` (register candidate from manifest), `POST /ai/models/:id/validate` (dentist sign-off), `POST /ai/models/:id/deploy|retire`; `POST /screenings/:id/ai-analyse` (manual trigger), `GET /screenings/:id/ai-result`; internal: `POST ai-inference:/v1/analyse` |
 | 7 | `GET /campaigns` (public), `POST /donations/orders` (public), `POST /webhooks/razorpay`, `GET /donations`, `GET /donations/:id`, `POST /donations/:id/receipt/resend`, `GET /donations/reconciliation`, `GET/POST/PATCH /campaigns` |
-| 3, 7 | `GET /reports/overview`, `GET /reports/camps`, `GET /reports/referrals`, `GET /reports/programmes` (Phase 3); `GET /reports/donations`, `POST /donations/statutory-exports` (Phase 7); `POST /reports/exports` (async job → private media asset, downloaded from the admin) |
+| 6 (engagement) | `POST /webhooks/telephony` (call events, provider-signed), `GET /intake-calls`, `GET /intake-calls/:id` (transcript, recording signed URL), `GET /pre-registrations?phone=`, `POST /pre-registrations/:id/confirm` (per-field confirmed/corrected/discarded, creates or links the patient), `POST /pre-registrations/:id/discard`; `GET/POST /patients/:id/reminders`, `POST /reminders/:id/stop`, `GET /reminders/due`; `POST /webhooks/whatsapp` (delivery status and inbound replies), `GET /inbound-messages?status=`, `POST /inbound-messages/:id/resolve` |
+| 3, 8 | `GET /reports/overview`, `GET /reports/camps`, `GET /reports/referrals`, `GET /reports/programmes` (Phase 3); `GET /reports/donations`, `POST /donations/statutory-exports` (Phase 8); `POST /reports/exports` (async job → private media asset, downloaded from the admin) |
 
 ### 9.3 Lists, filtering, pagination
 
@@ -1025,7 +1070,7 @@ No permission cache (the role lookup is a 1 ms indexed query) and no query-resul
 | --- | --- | --- | --- |
 | Patients | 10–20 k | 100 k | Trigram index on 100 k names ≈ 30 MB; fine |
 | Encounters | 20–40 k | 250 k | Partition candidate at 1 M rows (§19) |
-| Audit rows | 200 k | 2 M | Monthly partitions from Phase 6 |
+| Audit rows | 200 k | 2 M | Monthly partitions at the §19 threshold |
 | Donations | 1–5 k | 30 k | Trivial |
 | CMS media | 500 files, 2 GB | 10 GB | media volume, public path |
 | Screening images | 20–40 k encounters × ~5 views × ≤200 KB ≈ 20–40 GB | 150–250 GB | **The dominant storage cost.** Client-side resize to 1600 px long edge and JPEG q80 before upload; server re-encode; see §15.1 for disk sizing and §20.2 item 5 |
@@ -1045,7 +1090,7 @@ These numbers say: a single Postgres on a 2 vCPU/4 GB VPS is comfortably over-pr
 | `email.send` | enquiry received, invite, reset, receipt, referral notice | 5× exponential, 1 min → 2 h | dead-letter → alert |
 | `media.thumbnail` | screening image upload complete | 3× | thumbnail for the review gallery; CMS image variants are generated inline at upload |
 | `report.export` | admin requests CSV/PDF | 2× | writes a private media asset; the requester downloads it **from the admin, authenticated and audited**; the email only says "your export is ready" and never carries a link to PHI |
-| `donations.statutory_export` (Phase 7) | on demand, finance | 1× | Form 10BD statement and 10BE certificates for a financial year (§8.6) |
+| `donations.statutory_export` (Phase 8) | on demand, finance | 1× | Form 10BD statement and 10BE certificates for a financial year (§8.6) |
 | `webhook.reprocess` | webhook processing failure | 10× | replays stored payload |
 | `db.backup` | every 6 h | 1× + alert | `pg_dump` + media dir → restic (run by the `backup` container's cron, not pg-boss, so it works when the app is down) |
 | `sessions.prune`, `login_attempts.prune` | daily | — | housekeeping |
@@ -1056,7 +1101,12 @@ These numbers say: a single Postgres on a 2 vCPU/4 GB VPS is comfortably over-pr
 | `ai.labels_materialise` | nightly | — | derives `labels` from completed dentist reviews for the training pipeline |
 | `cessation.sessions_due` | daily 08:00 IST | — | sessions due in 7 days onto the counsellor worklist; missed sessions → call task |
 | `lesions.surveillance_due` | daily | — | open assessments past `review_interval_weeks` → follow-up task and dashboard flag |
-| `donations.reconcile` (Phase 7) | hourly | 3× | fetch gateway orders in `pending` > 30 min, fix state |
+| `calls.transcribe_and_classify` (Phase 6) | call completed with consent | 3× | speech-to-text → slot-filling → `pre_registrations` draft with confidences; failure leaves the call as `completed` with no draft and a task for ops |
+| `reminders.dispatch` (Phase 6) | every 5 min | 3× | `reminder_deliveries` due and inside quiet hours → WhatsApp template send via the provider; consent re-checked at send |
+| `reminders.generate` (Phase 6) | prescription or follow-up saved with WhatsApp consent present | 1× | expands frequency × duration into `reminder_deliveries` rows |
+| `whatsapp.inbound` (Phase 6) | provider webhook | 5× | classify reply; STOP → revoke consent and stop reminders; reschedule/rebook → ops task |
+| `pre_registrations.expire` (Phase 6) | daily | — | drafts older than 90 days with no camp match → `expired`; recording deleted per §8.9 |
+| `donations.reconcile` (Phase 8) | hourly | 3× | fetch gateway orders in `pending` > 30 min, fix state |
 | `privacy.anonymise` | monthly, **disabled until a retention period is configured** | — | retention policy from §8.9 |
 
 ### 13.2 Guarantees
@@ -1066,7 +1116,7 @@ These numbers say: a single Postgres on a 2 vCPU/4 GB VPS is comfortably over-pr
 - The consumer runs in-process with concurrency 2 (D21). `worker.ts` is the entry point for running it as a separate container from the same image when exports or PDFs start to slow requests (§19).
 - Failures after all retries land in pg-boss's archive with `state='failed'`; the 5-minute check script alerts when any failed job is younger than 24 h and the admin dashboard shows a "failed jobs" tile with the payload and error.
 
-### 13.3 Payment webhook processing (Phase 7)
+### 13.3 Payment webhook processing (Phase 8)
 
 ```
 receive → verify HMAC (raw body, gateway secret); invalid → 401, logged, security alert, nothing stored
@@ -1174,7 +1224,7 @@ Config is env-only (`src/server/config.ts`, zod-validated). `.env.example` is th
 - **Developer-machine mirror.** A scheduled task on the developer's machine runs `restic copy` from the VPS whenever the machine is online (typically daily); check.sh alerts if the mirror is older than 3 days. This is the only protection against loss of the VPS itself, so the effective RPO for that case is the age of the last mirror. Accepted risk (D24); a backup host or a cheap object-storage bucket replaces the mirror in one day when the organisation is ready.
 - **Monthly restore test on the VPS** (not on GitHub runners, so no PHI or keys leave our machines): restore the newest dump into a throwaway Postgres container, run row-count and referential-integrity checks, restore a sample of media files and verify hashes, post the result to the alert channel. A restore that has not been tested is not a backup; check.sh alerts if the last test is older than 35 days. The developer runs the same script against the mirror once a quarter.
 - **Keys.** The restic passphrase, the application encryption key and the super-admin recovery codes are held by the developer; a printed, sealed copy goes to the organisation's founder with the one-page recovery instructions from `docs/runbooks/disaster-recovery.md` (D24).
-- **Targets:** RPO 6 h for corruption, mirror age for VPS loss; **RTO 4 h** via the runbook (new VPS → compose up → restic restore from the mirror → DNS switch), rehearsed once before the first real patient record exists (Phase 0 exit criterion) and again before public launch (Phase 6).
+- **Targets:** RPO 6 h for corruption, mirror age for VPS loss; **RTO 4 h** via the runbook (new VPS → compose up → restic restore from the mirror → DNS switch), rehearsed once before the first real patient record exists (Phase 0 exit criterion) and again before public launch (Phase 7).
 
 ---
 
@@ -1219,10 +1269,10 @@ Target under 8 minutes. `nightly.yml` runs the full Playwright suite, `npm audit
 | Unit | Vitest | pure functions: stage machines (encounter, referral, dentist review, donation), dedup scoring, zod schemas including clinical value ranges (BP 60–250, temperature 34–42 °C, SpO2 50–100, pulse 30–220), DTO mappers, permission resolution, receipt numbering | every push, < 30 s |
 | Integration | Vitest + GitHub Actions Postgres service | each service against real Postgres: transactions, constraints, idempotency, scope predicates, audit rows written; **authorisation matrix test**: every `/api/v1` endpoint × every role asserts 200/403 from a generated table so a new endpoint without a permission fails the build; **privacy tests**: audit rows for T2/T3 entities contain no values, signed media URLs expire, contact fields are masked without `patients:read_contact`, a full run's log output contains no seeded names or phone numbers | every push |
 | E2E smoke | Playwright | login + MFA; register a patient with photos on a 360 px phone viewport (and the same flow at 768 px nightly); dentist review and refer; CMS publish shows on the public page | every push (4 flows) |
-| E2E full | Playwright | the complete pathway in §18 Phase 3's exit criteria; contact form → enquiry → Mailpit; lesion and cessation flows; AI result visible in a review (Phase 5); donation happy path in gateway test mode (Phase 7) | nightly |
+| E2E full | Playwright | the complete pathway in §18 Phase 3's exit criteria; contact form → enquiry → Mailpit; lesion and cessation flows; AI result visible in a review (Phase 5); donation happy path in gateway test mode (Phase 8) | nightly |
 | Load check | `scripts/load-smoke.ts` (plain Node, no k6) | 10 simulated phones submitting encounters with photos for 10 minutes; records p95 and error count | before the first live camp in Phase 2 and Phase 3, on staging |
 | AI model | `ai/evaluate.py` against the dentist-labelled held-out set | sensitivity and specificity per condition above the thresholds in the model manifest; a model that regresses cannot be marked `validated`; the inference API contract test runs the container against three fixture images | before every model deploy; contract test on every push |
-| Security | authz matrix, gitleaks, Trivy, npm audit, the 20-item checklist in Phase 6 | CI + Phase 6 |
+| Security | authz matrix, gitleaks, Trivy, npm audit, the 20-item checklist in Phase 7 | CI + Phase 7 |
 | Restore | monthly restore test on the VPS, quarterly against the developer-machine mirror | backups are real | scheduled |
 
 Test-first is required for the code that can hurt someone: stage machines, permissions and scope, dedup and merge, money and receipts, consent enforcement. UI glue is tested through the smoke flows; there is no coverage percentage target.
@@ -1233,7 +1283,7 @@ Test-first is required for the code that can hurt someone: stage machines, permi
 
 **Order rationale.** The public website already works on the no-code platform; the real pain is patient data in spreadsheets and forms. So the HMIS reaches a real camp before the website is rebuilt, and everything that protects patient data (backups, restore test, alerting, privacy controls, MFA, audit) is in place *before* the first real patient record, not in a final hardening phase. The council review (§22) was unanimous on this reordering.
 
-Each phase is delivered module by module (§23.1) and ends with a demo on staging, the exit criteria checked, a tagged release, and a short note in `docs/adr/`. Indicative durations assume one developer at roughly half time. The council judged the original estimates optimistic by 1.5–2×; the nominal total below to the end of Phase 6 is about 33 weeks (Phase 5 can overlap Phase 4), so plan for **10–14 calendar months** and treat each phase's exit criteria, not its week count, as the commitment. Camp dates and donation decisions are not development dependencies (§20.1); the live camps are validation points, not gates on the next phase's code.
+Each phase is delivered module by module (§23.1) and ends with a demo on staging, the exit criteria checked, a tagged release, and a short note in `docs/adr/`. Indicative durations assume one developer at roughly half time. The council judged the original estimates optimistic by 1.5–2×; the nominal total below to the end of Phase 7 is about 39 weeks (Phase 5 can overlap Phase 4), so plan for **12–16 calendar months** and treat each phase's exit criteria, not its week count, as the commitment. Camp dates and donation decisions are not development dependencies (§20.1); the live camps are validation points, not gates on the next phase's code.
 
 ### Phase 0 — Foundation, deploy, backups (≈ 3 weeks)
 
@@ -1326,7 +1376,26 @@ Exit criteria: an ops admin changes the home hero text and image and sees it liv
 
 Exit criteria: the deployed model's validation report meets the thresholds the dentist signed; a failed or slow inference never blocks or alters a review (test); results are visible only to roles with `ai:results:read`; every result row carries model name and version; retiring a model leaves historical results intact; agreement-rate report reconciles with a direct SQL count.
 
-### Phase 6 — Hardening, launch, hand-over (≈ 2 weeks)
+### Phase 6 — Patient engagement: AI intake call and WhatsApp reminders (≈ 6 weeks; requested by the founder on 2026-09-29, §20.1 item 34)
+
+**Goal:** a patient can call the organisation's number and have an AI voice agent take their details and complaint in Hindi or English, so that at the camp the volunteer and dentist confirm a pre-filled draft instead of starting from nothing; after a consultation, the patient receives WhatsApp reminders for medication, ointment, appointments and follow-ups, and can reply to reschedule. Built on the consent, communications, prescription and follow-up records from Phases 2–3. See D28 and D29 for the rules that bound it.
+
+*Drop 6a — AI intake call and pre-registration (≈ 4 weeks)*
+- Telephony: an Indian phone number on a SIP trunk or cloud telephony API (§20.2), answered by a self-hosted voice pipeline: speech-to-text (self-hosted Whisper-class model), a scripted dialogue with a classification model turning answers into the pre-registration fields, and text-to-speech; hours of operation and a "press 0 / say 'human'" fallback to a voicemail task for ops.
+- Consent prompt at the start of every call ("this call is recorded to prepare your visit"); no recording or storage before the caller agrees; a `consents` row of type `call_recording` linked to the phone number, attached to the patient once matched.
+- `intake_calls` and `pre_registrations` (§8.5.11): recording in private storage, transcript, per-field values with confidence, language; status `draft` until a volunteer confirms it at the camp. Nothing from a call is ever written into `patients` or an encounter automatically (D28).
+- Camp-side review: when a volunteer registers a patient whose phone matches a draft, the registration form is pre-filled from it, each field visibly marked "from call, please confirm"; the volunteer confirms, corrects or discards; the dentist sees the confirmed values and the original transcript excerpt on request. Audit records which fields came from the call and who confirmed them.
+- Reporting: calls per day, match rate at camp, fields corrected by volunteers per field (the quality signal for the script and the models).
+
+*Drop 6b — WhatsApp reminders and appointment replies (≈ 2 weeks)*
+- WhatsApp Business Platform through a provider (§20.2); pre-approved message templates for medication/ointment reminders, appointment and follow-up reminders, and an opt-out confirmation; consent type `contact_whatsapp` recorded at registration or at the clinic.
+- `patient_reminders` (§8.5.11) generated from the dentist's prescription (`medications[].frequency`, `duration_days`, `instructions`) and from `follow_ups`/referral `scheduled_for`; a job dispatches due reminders every five minutes within the patient's quiet hours; every send and delivery status is a `patient_communications` row.
+- Inbound replies: a reschedule/rebook request creates an ops task with the patient and the appointment; "STOP" revokes the WhatsApp consent; anything else is logged for a human. No clinical advice is ever generated by the system; reminders repeat only what the dentist recorded (D29).
+- Ops screen: reminders due, sent, failed, replies to handle.
+
+Exit criteria: a scripted test call in Hindi and one in English produce a draft with the expected fields and confidences; a volunteer registration pre-fills from the draft, and a field corrected by the volunteer is stored with the corrected value and an audit trail naming the source; a call without consent stores nothing (test); a prescription with "three times a day for seven days" yields exactly 21 reminder rows at the configured times and the WhatsApp provider's sandbox receives them; a "STOP" reply revokes consent and stops further sends (test); the misrecognition case from the vendor demo (an age heard as "Take five", a gender heard as "Nail") is reproduced with a synthetic transcript and results in low-confidence fields that the form highlights rather than accepts; cost report for a month of calls and messages presented to the owner.
+
+### Phase 7 — Hardening, launch, hand-over (≈ 2 weeks)
 
 **Goal:** the whole platform is declared production, the operational documents exist, and the organisation can run it without the developer being on call every day.
 
@@ -1339,7 +1408,7 @@ Exit criteria: the deployed model's validation report meets the thresholds the d
 
 Exit criteria: checklist has zero open high items; DR rehearsal within RTO; every alert re-verified; the founder holds the sealed envelope; the §23.5 hand-over checklist is complete; hypercare complete.
 
-### Phase 7 — Donations and finance (≈ 4 weeks; **parked until the organisation asks**, gateway to be chosen)
+### Phase 8 — Donations and finance (≈ 4 weeks; **parked until the organisation asks**, gateway to be chosen)
 
 **Goal:** public online donations with verified payment state, gap-free receipts, statutory exports and a finance view. Built thin on gateway-hosted checkout. The schema (§8.6) and the webhook design (§13.3) are fixed now so nothing built earlier has to change; the phase starts when the organisation confirms the 80G details and the gateway (§20).
 
@@ -1353,9 +1422,9 @@ Exit criteria: checklist has zero open high items; DR rehearsal within RTO; ever
 
 Exit criteria: a forged success callback cannot mark a donation succeeded (test); a duplicate webhook produces one receipt; reconciliation repairs a simulated missed webhook; receipt numbers have no gaps across a test month with induced rollbacks (test); the 10BD export matches the ledger for a test year; ledger totals equal the gateway settlement report for a test week; no card data or plaintext PAN in any log or table.
 
-### Phase 8 — Continuous iteration (ongoing)
+### Phase 9 — Continuous iteration (ongoing)
 
-Monthly: dependency updates, check.sh monthly report review, restore test result, threshold check against §19, retention job review, model agreement-rate review, user feedback triage. Candidate backlog after v1, each only when the organisation asks: SMS/WhatsApp patient communications, a "record decision on behalf of the on-site dentist" co-sign step, consent management and retention (D23), a backup host and trustees (D24), online donations (Phase 7), Hindi public site, volunteer self-service onboarding, ABHA integration, multi-organisation tenancy.
+Monthly: dependency updates, check.sh monthly report review, restore test result, threshold check against §19, retention job review, model agreement-rate review, user feedback triage. Candidate backlog after v1, each only when the organisation asks: SMS/WhatsApp patient communications, a "record decision on behalf of the on-site dentist" co-sign step, consent management and retention (D23), a backup host and trustees (D24), online donations (Phase 8), Hindi public site, volunteer self-service onboarding, ABHA integration, multi-organisation tenancy.
 
 ---
 
@@ -1407,14 +1476,14 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 | 14 | Patient messaging | Dropped; internal alerts may use Slack or Discord | D23, §4.3, §13.1: call and in-person log only; alert channel Slack or Discord |
 | 15 | Languages | English only | §18 Phase 2b: Hindi labels on the prescription print sheet only if asked |
 | 16 | CAPTCHA | ALTCHA | §18 Phase 4 |
-| 17 | Gateway and 80G | Parked; organisation to be asked | §18 Phase 7 marked parked |
+| 17 | Gateway and 80G | Parked; organisation to be asked | §18 Phase 8 marked parked |
 | 18 | AI screening | To be asked whether it is in scope | schema ready (§8.5.5); job disabled |
 | 19 | SMTP account | A Gmail address will be provided | §5; app password to be created by the account owner |
 | 20 | Alert channel | Slack | §14.2 |
 | 21 | Volume | About 100 patients per camp day | §12.4 basis |
 | 22 | Photo views | Dentist will confirm; not a hard cap, depends on the case | §8.5.5: at least one image, no maximum, views are guidance |
 | 23 | AI screening | **In scope** | D25, §8.5.10, §18 Phase 5, `ai-inference` container |
-| 24 | Camp date and 80G | Must not affect development | Phase 5 (AI) no longer waits on a live camp date; donations remain Phase 7 and parked |
+| 24 | Camp date and 80G | Must not affect development | Phase 5 (AI) no longer waits on a live camp date; donations remain Phase 8 and parked |
 | 25 | Development style | Module-wise so nothing tangles; no low-quality generated code; documentation maintained for hand-over; internal and external APIs versioned | D26, §23 |
 | 26 | Product scope (message received 2026-09-29) | A dental EMR built for camps, linked to the clinic: dental screening and treatment camps, clinic operations, oral cancer and tobacco cessation services | §1, §8.5.9 programmes, D27 clinic operations scope, §18 Phase 3 |
 | 27 | Who counsels; camp flow | The dentist counsels. The volunteer registers the patient, takes vitals, records the complaint and habits, and drafts a structured summary for the dentist | §8.5.8 flow confirmed; `counsellor` is a role the dentist holds by default (a trained volunteer can be given it later); the registration steps in Phase 2 are the "structured summary" |
@@ -1424,6 +1493,7 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 | 31 | Secrets and webhook URLs | The developer fills them into the env file; the plan must produce `.env.example` listing every variable | Phase 0 deliverable (§23.5 item 9); `config.ts` refuses to boot without them |
 | 32 | Truthfulness of the built system | Past experience: an assistant described a Redis cache flow that did not exist in the code. Nothing in this platform may be described as doing something the code does not do | §23.6 (new), and the working agreement in §23.7 |
 | 33 | AI-assisted development set-up | Fable orchestrates and decides with the product owner; Opus subagents for development; Sonnet subagents for read-only work; to be written into `CLAUDE.md` when that file is created (not yet) | §23.7 |
+| 34 | Patient-facing engagement (from the founder, 2026-09-29) | An AI agent answers calls to the organisation's number, captures and classifies the patient's information so they need not repeat it at the camp, visible to volunteer and dentist; automated WhatsApp reminders after consultation (ointment/medication times, appointments, rebooking). A vendor demo screenshot showed the classification output and its misrecognitions | §1 item 4, module `patient_engagement` (§4.3), D28, D29, §8.5.11, §13.1, §18 Phase 6; partially supersedes item 14 and D23 for WhatsApp |
 
 ### 20.2 Still open
 
@@ -1432,7 +1502,14 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 3. **Lesion vocabulary, when Phase 3 starts.** The dentist confirms the lesion types and sites in §8.5.9 before the form is built. (Phase 3)
 4. **AI first target, when Phase 5 starts.** Which conditions the first model should detect, and a dentist to label the validation set and sign the thresholds. (Phase 5)
 5. **First live camp.** Once Phase 2 is done, the next real camp runs on the platform; the developer needs to know about two weeks ahead which camp, volunteer and dentist. Not a development dependency. (Phase 2b)
-6. **Gateway and 80G.** Parked until the organisation asks for online donations. Not a development dependency. (Phase 7)
+6. **Gateway and 80G.** Parked until the organisation asks for online donations. Not a development dependency. (Phase 8)
+7. **Consent wording and retention period.** Not required by the organisation today; the recommendation in D23 stands. Note that a tobacco cessation programme and an oral cancer surveillance list hold data over months to years, which makes a retention decision more useful sooner.
+8. **Telephony for the intake call (Phase 6).** Which Indian number, and which route: a SIP trunk into self-hosted FreeSWITCH/Asterisk, or a cloud telephony API (Exotel, Knowlarity, Twilio)? Expected call volume per day? Hours of operation and what happens outside them? Budget for per-minute charges.
+9. **WhatsApp Business Platform (Phase 6).** Which provider, the business verification, the display name, and the per-conversation cost the organisation accepts; whether the same number is used for the voice line.
+10. **Consent wording for call recording and WhatsApp (Phase 6).** The exact spoken prompt at the start of a call and the registration-form wording for WhatsApp contact; whether the founder wants D23 revisited now that patient messaging exists.
+11. **Languages for the voice agent (Phase 6).** Hindi and English assumed; are Marathi or others needed at the camps the organisation serves?
+12. **Human fallback (Phase 6).** Who receives the voicemail/human-requested tasks and by when must they call back?
+13. **Unmatched callers (Phase 6).** Drafts whose phone number never appears at a camp: keep 90 days then delete (proposed), or contact them?
 7. **Consent wording and retention period.** Not required by the organisation today; the recommendation in D23 stands. Note that a tobacco cessation programme and an oral cancer surveillance list hold data over months to years, which makes a retention decision more useful sooner.
 
 ---
@@ -1456,6 +1533,9 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 | Cessation enrolment / session | A patient's participation in the tobacco cessation programme and each counselling contact within it |
 | AI screening result | A preliminary, model-produced read of a screening's images; assistive only (D25) |
 | Model manifest | The recorded name, version, training-set hash, validation metrics and thresholds of a deployed AI model |
+| Intake call | A phone call answered by the AI voice agent that captures a patient's details before a camp |
+| Pre-registration draft | The structured, confidence-marked output of an intake call; becomes part of the record only after a volunteer confirms it (D28) |
+| Reminder | A WhatsApp template message generated from a dentist's prescription or a scheduled follow-up, sent with the patient's consent (D29) |
 | Consent | A per-type, per-grant record (treatment, data, photography, contact channels, research) that gates communications and image use |
 | Tier (T0–T3) | Privacy classification of a field or bucket, §8.9 |
 | Dedup | Detecting that a registration matches an existing patient |
@@ -1494,14 +1574,14 @@ Sharding is not on this table. At the data volumes in §12.4, a single Postgres 
 | Audit log partitioning | scheduled for Phase 6 at 200 k rows | only at the §19 threshold (5 M rows); the Phase 6 item contradicted §19 | §19 |
 | Git ceremony | PR-only, release tooling, weekly Dependabot | trunk-based, PRs for risky changes, monthly grouped Dependabot | §16.1, §16.4 |
 | Coverage target | 80 % on `src/server` | none; test-first required for state machines, permissions, money, consent | §17 |
-| Runbooks | eight | four that will actually be maintained | §18 Phase 6 |
+| Runbooks | eight | four that will actually be maintained | §18 Phase 7 |
 | Restore test | GitHub Actions job | on the backup host (no PHI or keys on GitHub runners) | §15.5 |
 | Phase order | website and CMS first, HMIS third, hardening last | backups, alerting and privacy in Phase 0–1; HMIS pilot in Phase 2; website in Phase 4 | §18 |
 
 ### 22.2 Under-engineering the council found, now fixed
 
 - **Receipt numbers** were a Postgres sequence, which skips on rollback, and counted by calendar year; 80G receipts need gap-free numbering per Indian financial year. Now a locked per-year counter (D22, §8.6).
-- **Form 10BD / 10BE** statutory exports were missing. Added to §8.6 and the donations phase (now Phase 7).
+- **Form 10BD / 10BE** statutory exports were missing. Added to §8.6 and the donations phase (now Phase 8).
 - **Donor PAN** was plaintext. Now encrypted with an HMAC lookup, finance-only (§8.6, §8.9).
 - **Retention and erasure policy** was an open question while patients would be registered in the same phase. Now blocking before the first real patient (Q7), with the anonymisation job specified (§8.9).
 - **Key escrow and bus factor**: nobody could decrypt the backups if one laptop was lost. Now sealed envelopes with two trustees and a second break-glass operator (§15.5, Q17).
@@ -1596,7 +1676,7 @@ Kept current, in the repository, in this order of importance for someone new:
 8. `ai/README.md`: how to export labels, train, evaluate, register and deploy a model; how to roll back.
 9. `.env.example` with every variable explained.
 
-Hand-over is complete when a developer who has never seen the code can, following only these documents: run the stack locally with seed data; deploy a change to staging and production and roll it back; restore a backup; add a permission to a role; add a field to the registration form end to end; retrain and deploy a model candidate; and explain to the organisation what data is held and who can see it. The developer rehearses this list with a colleague or by doing it on a clean machine before Phase 6 exits.
+Hand-over is complete when a developer who has never seen the code can, following only these documents: run the stack locally with seed data; deploy a change to staging and production and roll it back; restore a backup; add a permission to a role; add a field to the registration form end to end; retrain and deploy a model candidate; and explain to the organisation what data is held and who can see it. The developer rehearses this list with a colleague or by doing it on a clean machine before Phase 7 exits.
 
 ### 23.6 Claims match code: no component or flow exists on paper only
 
