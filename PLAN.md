@@ -789,7 +789,7 @@ inbound_messages         -- WhatsApp replies
 
 `patient_communications.channel` gains `'whatsapp'` as a live channel in Phase 6; `consents.type` gains `'call_recording'`. The camp registration form (Phase 2) reads `pre_registrations` by phone number and pre-fills with "from call, please confirm" markers.
 
-### 8.6 Donations and payments (schema fixed now, built in Phase 4)
+### 8.6 Donations and payments (schema fixed now, built in Phase 8 when the organisation asks)
 
 ```
 campaigns   id, slug unique, title, description, goal_paise, currency 'INR', starts_on, ends_on, is_active, cms_section_id null, created_by
@@ -1424,7 +1424,7 @@ Exit criteria: a forged success callback cannot mark a donation succeeded (test)
 
 ### Phase 9 — Continuous iteration (ongoing)
 
-Monthly: dependency updates, check.sh monthly report review, restore test result, threshold check against §19, retention job review, model agreement-rate review, user feedback triage. Candidate backlog after v1, each only when the organisation asks: SMS/WhatsApp patient communications, a "record decision on behalf of the on-site dentist" co-sign step, consent management and retention (D23), a backup host and trustees (D24), online donations (Phase 8), Hindi public site, volunteer self-service onboarding, ABHA integration, multi-organisation tenancy.
+Monthly: dependency updates, check.sh monthly report review, restore test result, threshold check against §19, retention job review, model agreement-rate review, user feedback triage. Candidate backlog after v1, each only when the organisation asks: SMS as a second patient channel (WhatsApp is Phase 6), a "record decision on behalf of the on-site dentist" co-sign step, consent management and retention (D23), a backup host and trustees (D24), online donations (Phase 8), Hindi public site, volunteer self-service onboarding, ABHA integration, multi-organisation tenancy.
 
 ---
 
