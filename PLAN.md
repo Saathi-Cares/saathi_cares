@@ -368,7 +368,7 @@ saathi_cares/
 │   ├── postgres/ (init.sql: extensions, roles, grants; postgresql.conf)
 │   ├── checks/   (check.sh, logq.sh, monthly-report.sh, crontab)
 │   ├── backup/   (backup.sh, restore-test.sh, restic.env.example)
-│   └── observability/ (deferred profile: prometheus.yml, grafana provisioning)
+│   └── observability/ (added only at the §19 trigger: prometheus.yml, grafana provisioning)
 ├── ai/                               # inference service (Dockerfile, app/), training pipeline (export, train, evaluate), README; not part of the web image
 ├── e2e/                              # Playwright
 ├── scripts/                          # one-off: create-superadmin, rotate-secret, load-smoke, rollback, mirror-backup (developer machine)
@@ -1177,7 +1177,7 @@ A free hosted uptime monitor (D24): HTTPS check of `/api/health/ready` every 5 m
 
 ### 14.6 Deferred: the `observability` profile
 
-`infra/observability/` holds a ready compose profile with Prometheus, Grafana, `postgres_exporter` and `node_exporter`, provisioned dashboards (service health, database, jobs, security) and the same alert rules as §14.4. It is enabled at the §19 trigger. Log aggregation (Loki or equivalent) is considered only when there is more than one host.
+When the §19 trigger fires, an `infra/observability/` compose profile is added with Prometheus, Grafana, `postgres_exporter` and `node_exporter`, provisioned dashboards (service health, database, jobs, security) and the same alert rules as §14.4. It is not created before then: a profile nothing runs would be a dormant component (§23.6). Log aggregation (Loki or equivalent) is considered only when there is more than one host.
 
 ---
 
@@ -1200,7 +1200,7 @@ There is no backup host in v1 (D24). The restic repository lives on the attached
 | `backup` | custom (postgres client + restic + cron) | core | 128 MB | `pg_dump` every 6 h + media directory → restic repository on the attached volume; exposes the repository read-only over SSH for the developer-machine mirror; also runs disk and backup-age checks so they work if the app is down |
 | `ai-inference` | custom Python image (FastAPI + ONNX Runtime CPU), models mounted read-only | core from Phase 5 | 1 GB | internal network only; `GET /v1/health`, `POST /v1/analyse`; scaled to 0 replicas until a validated model is deployed |
 | `mailpit` | axllent/mailpit | dev | 64 MB | catches all dev and staging email at `localhost:8025` |
-| `prometheus`, `grafana`, `postgres_exporter`, `node_exporter` | official | observability (off by default) | ~600 MB total | enabled at the §19 trigger; Grafana behind Nginx `/grafana` with auth and IP allowlist |
+| `prometheus`, `grafana`, `postgres_exporter`, `node_exporter` | official | observability (not in the repo until the §19 trigger) | ~600 MB total | added and enabled at the §19 trigger; Grafana behind Nginx `/grafana` with auth and IP allowlist |
 
 Resident memory budget with `core` only: about 2.6 GB including the OS, leaving room for a `staging` project to be started on demand. Networks: `edge` (nginx ↔ app), `internal` (app/migrate/backup ↔ postgres); only nginx is on both. Every service has a memory limit so one runaway container cannot take the box down.
 
