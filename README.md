@@ -76,7 +76,6 @@ Code in the repository that no route, script or test uses today (PLAN.md §23.6)
 | --- | --- | --- |
 | `src/components/ui/*` except `button.tsx` (the other shadcn primitives), `src/hooks/use-mobile.tsx`, `src/hooks/use-toast.ts` | Carried over from the initial commit (the Vite app) | Imported by a page or component, from Phase 1's portal screens on |
 | npm packages used only by those primitives: `cmdk`, `embla-carousel-react`, `input-otp`, `react-hook-form`, `react-resizable-panels`, `recharts` | Dependencies of the primitives above | Same as above |
-| `drizzle-kit` (dev dependency; no script runs it) | Added with the Next.js scaffold; migrations are plain SQL run by `runMigrations` | A script that generates or checks migrations with it |
 | `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `InvalidTransitionError` in `src/server/http/errors.ts` | Part of the PLAN.md §9.7 taxonomy | Used from Phase 1 (auth, RBAC, stage machines) |
 
 No infrastructure service is dormant: the only external service is Postgres, which the readiness check, the migration runner and the job queue all use.

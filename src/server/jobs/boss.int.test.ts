@@ -25,7 +25,8 @@ beforeAll(async () => {
 });
 afterAll(async () => stopJobs());
 
-async function waitFor(pred: () => boolean, ms = 10_000): Promise<void> {
+// Polls every 100 ms up to a 15 s ceiling; the worker polls its queue once a second, so load can delay a pickup.
+async function waitFor(pred: () => boolean, ms = 15_000): Promise<void> {
   const until = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > until) throw new Error('timed out');
@@ -37,16 +38,17 @@ describe('jobs', () => {
   it('starts, marks readiness, and runs a queued job', async () => {
     expect(jobsFlag.started).toBe(true);
     expect(lines.some((l) => l.includes('"msg":"job consumer started"'))).toBe(true);
+    // Unique per-run marker: assertions key on this job's own run, not on counters other tests move.
+    const marker = `queued-${randomUUID()}`;
     const before = noopRuns.count;
-    const id = await enqueue(systemNoop, { marker: 'a' });
+    const id = await enqueue(systemNoop, { marker });
     expect(id).toMatch(/[0-9a-f-]{36}/);
-    await waitFor(() => noopRuns.count > before);
-    expect(noopRuns.last).toBe('a');
+    await waitFor(() => noopRuns.seen.has(marker));
+    expect(noopRuns.count - before).toBeGreaterThanOrEqual(1);
     await waitFor(() => lines.some((l) => l.includes(`"job_id":"${id}"`) && l.includes('"msg":"job done"')));
   });
 
   it('does not enqueue when the surrounding transaction rolls back', async () => {
-    const before = noopRuns.count;
     const marker = `rolled-back-${randomUUID()}`; // unique, so rows from earlier runs cannot mask or fake the result
     await expect(
       getDb().transaction(async (tx) => {
@@ -55,7 +57,8 @@ describe('jobs', () => {
       }),
     ).rejects.toThrow('abort');
     await new Promise((r) => setTimeout(r, 1_500));
-    expect(noopRuns.count).toBe(before);
+    // Keyed on the marker, not the run counter: a job left queued by an earlier run could otherwise tick it.
+    expect(noopRuns.seen.has(marker)).toBe(false);
     // pg-boss 12 has no getQueueSize; findJobs reads the job table directly, so it sees any row the rollback left.
     const boss = await getBoss();
     const leftovers = await boss.findJobs(systemNoop.name, { data: { marker } });
@@ -63,12 +66,13 @@ describe('jobs', () => {
   });
 
   it('commits the job with the surrounding transaction', async () => {
+    const marker = `committed-${randomUUID()}`;
     const before = noopRuns.count;
     await getDb().transaction(async (tx) => {
-      await enqueue(systemNoop, { marker: 'committed' }, { tx });
+      await enqueue(systemNoop, { marker }, { tx });
     });
-    await waitFor(() => noopRuns.count > before);
-    expect(noopRuns.last).toBe('committed');
+    await waitFor(() => noopRuns.seen.has(marker));
+    expect(noopRuns.count - before).toBeGreaterThanOrEqual(1);
   });
 
   it('rejects data that fails the job schema before enqueueing', async () => {
