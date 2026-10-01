@@ -74,10 +74,12 @@ quick run is the first 429.
 
 **What a 429 looks like.** Stock Nginx answers a `limit_req` rejection with an HTML page and no `Retry-After`. The HTTPS
 server in `conf.d/app.conf` sends every 429 to `location @rate_limited` (`error_page 429 = @rate_limited;`), which
-returns `Retry-After: 60`, `Content-Type: application/json`, HSTS and nosniff, and the PLAN.md §9.4 error envelope that
+returns `Retry-After: $retry_after`, `Content-Type: application/json`, HSTS and nosniff, and the PLAN.md §9.4 error envelope that
 the app uses (`src/server/http/errors.ts`):
-`{"error":{"code":"RATE_LIMITED","message":"Too many requests","request_id":"<Nginx $request_id>"}}`. A new
-rate-limited location in that server gets this for free. `staging.conf` has no rate-limited locations.
+`{"error":{"code":"RATE_LIMITED","message":"Too many requests","request_id":"<Nginx $request_id>"}}`. `Retry-After` is per zone: each
+rate-limited location sets `$retry_after` (60 for `login` and `public_forms`, 1 for `api`), and the variable survives
+the internal redirect to `@rate_limited`. The server block sets 60 as the default, so a new rate-limited location that
+forgets its own `set` still sends `Retry-After: 60`; give it `set $retry_after <seconds>;` matching its zone. `staging.conf` has no rate-limited locations.
 
 ## Staging returns 502 while it is stopped
 
