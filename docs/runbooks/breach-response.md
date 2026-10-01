@@ -27,8 +27,8 @@ Stop the damage first; preserve evidence second; investigate third.
 
   | Secret | Where it is used | Rotate |
   | --- | --- | --- |
-  | `SAATHI_APP_PASSWORD`, `SAATHI_OWNER_PASSWORD` | `app`, `migrate` (`infra/compose.yaml`) | `$C exec postgres psql -U postgres`, then `password saathi_app` (and `password saathi_owner`) and paste the new value at the prompt, so it is in neither `ps` nor the shell history; `q`; edit `/srv/saathi/.env.prod`, `$C up -d` |
-  | `POSTGRES_PASSWORD` | `backup` (`PGPASSWORD`) | `password postgres` in the same interactive `psql`, edit the env file, `$C up -d backup` |
+  | `SAATHI_APP_PASSWORD`, `SAATHI_OWNER_PASSWORD` | `app`, `migrate` (`infra/compose.yaml`) | `$C exec postgres psql -U postgres`, then `\password saathi_app` (and `\password saathi_owner`) and paste the new value at the prompt, so it is in neither `ps` nor the shell history; `\q`; edit `/srv/saathi/.env.prod`, `$C up -d` |
+  | `POSTGRES_PASSWORD` | `backup` (`PGPASSWORD`) | `\password postgres` in the same interactive `psql`, edit the env file, `$C up -d backup` |
   | `RESTIC_PASSWORD` | `backup`, the developer mirror | restic keys: `$C exec backup restic key add` (reads the new password), edit the env file, `$C up -d backup`, then `$C exec backup restic key list` and `restic key remove <old-id>`. Update the developer's stored passphrase (`host-setup.md` step 9). The mirror is a separate repository with its own copy of the old key: rotate there too |
   | `SLACK_WEBHOOK_URL` | `check.sh`, `monthly-report.sh`, `deploy-remote.sh` (read from the env file on every run; the `backup` container does not have it) | regenerate the webhook in Slack, edit both env files |
   | GHCR read token | `docker login` on the VPS | revoke on GitHub, create a new `read:packages` token, `docker login ghcr.io` again |

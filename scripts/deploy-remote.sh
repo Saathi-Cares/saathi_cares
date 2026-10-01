@@ -19,6 +19,14 @@ smoke_once() {
   fi
 }
 
+# usage: roll_back <repo> <project> <tag> <env file>. Runs rollback.sh; if that fails (under set -e it would end the
+# script with no alert), logs "failed rollback" and posts one alert. The deploy exits 1 either way.
+roll_back() {
+  if "$1/scripts/rollback.sh" "$2" "$3"; then return 0; fi
+  echo "$(date -Is) failed rollback $2 -> $3" >> /srv/saathi/deploys.log || true
+  notify "$4" "[ALERT] deploy: rollback of $2 to $3 failed; the app may be down. Check the app container (ps app) and run scripts/rollback.sh $2 $3 by hand"
+}
+
 # Trailing slashes removed, so /srv/saathi/ and /srv/saathi compare equal.
 trim_slash() {
   local p=$1
@@ -120,7 +128,7 @@ main() {
   if ! $compose up -d --no-deps app; then
     echo "app could not be recreated; rolling back to $prev"
     notify "$envf" "[ALERT] deploy: $tag on $project: recreating app failed; rolling back to $prev"
-    "$repo/scripts/rollback.sh" "$project" "$prev"
+    roll_back "$repo" "$project" "$prev" "$envf"
     exit 1
   fi
   # 3. health wait; back to the previous tag if the new app does not become healthy.
@@ -133,7 +141,7 @@ main() {
   if [ "$healthy" != yes ]; then
     echo "app did not become healthy; rolling back to $prev"
     notify "$envf" "[ALERT] deploy: $tag on $project did not become healthy; rolling back to $prev"
-    "$repo/scripts/rollback.sh" "$project" "$prev"
+    roll_back "$repo" "$project" "$prev" "$envf"
     exit 1
   fi
   echo "healthy"
@@ -143,7 +151,9 @@ main() {
   $compose up -d --remove-orphans
   # Nginx (in the prod project for both targets) resolves upstream names only at start or reload, and a recreated app
   # can get a new address: without the reload Nginx kept proxying to the old one (502, seen locally 2026-10-01).
-  docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod --profile core exec -T nginx nginx -s reload || true
+  # A failed reload is logged and alerted (infra/lib/host.sh) but does not stop the deploy: the smoke test below then
+  # decides, and fails if Nginx cannot reach the new app.
+  nginx_reload "$repo" "$(env_get SLACK_WEBHOOK_URL "$envf" || true)" "deploy $tag on $project" || true
 
   # 5. smoke test through the edge (Cloudflare -> Nginx -> app). No automatic rollback here: the container is healthy,
   # so a failure points at Nginx, the certificate or DNS; the operator decides (docs/runbooks/deploy-and-rollback.md).

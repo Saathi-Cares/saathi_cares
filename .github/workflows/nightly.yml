@@ -30,5 +30,5 @@ jobs:
       - run: npm audit --audit-level=high
       - run: docker build -t app:nightly .
       # Non-blocking (exit-code 0) per PLAN.md §11; the weekly review reads the table.
-      - uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with: { image-ref: 'app:nightly', severity: 'HIGH,CRITICAL', exit-code: '0', format: table }

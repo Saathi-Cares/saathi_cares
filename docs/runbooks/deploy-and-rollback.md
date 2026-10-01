@@ -34,8 +34,10 @@ What `deploy-remote.sh prod <tag>` does, in order:
 7. Waits up to 150 s (30 × 5 s) for the `app` container to be `healthy`. If it is not: Slack `[ALERT]`, then
    `rollback.sh prod <previous tag>`, exit 1.
 8. `up -d --remove-orphans` for everything else (Nginx and backup; Nginx waits for a healthy `app`, which it now has).
-   `migrate` runs once more here and finds nothing to apply. Then `nginx -s reload`: Nginx resolves `app` only at start
-   or reload, and the recreated container can have a new address (without the reload it answered 502 in a local test).
+   `migrate` runs once more here and finds nothing to apply. Then `nginx -t && nginx -s reload`: Nginx resolves `app`
+   only at start or reload, and the recreated container can have a new address (without the reload it answered 502 in
+   a local test). A failed test or reload appends `nginx reload failed (...)` to `deploys.log` and posts one `[ALERT]`,
+   but does not stop the deploy: the smoke test that follows fails if Nginx cannot reach the new app.
 9. Smoke test through the edge: `curl -fsS --max-time 10 https://cares.saathiventures.com/api/health/ready`, up to 12
    tries 5 s apart. Appends a `smoke` line to `deploys.log`.
 10. Only when the smoke test passes: writes the previous tag to `/srv/saathi/saathi.previous-tag` and the deployed
@@ -52,8 +54,8 @@ again covers every migration since then. Each failure posts one Slack `[ALERT]`.
 | --- | --- | --- | --- |
 | `checkout`, `pull`, `backup` | old app, untouched | previous tag | read the Actions log, fix, run the deploy again |
 | `migrate` | old app, untouched (`migrate` ran as a one-off container; verified locally on the core profile with Nginx, 2026-10-01; Task 8 step 3b repeats it on the VPS) | previous tag | "When `migrate` fails" below |
-| `up` (recreating `app` failed) | old app again (`rollback.sh` recreated it) | previous tag | read `$C logs --tail 100 app`, fix, release again |
-| `health` | old app again (`rollback.sh` recreated it and reloaded Nginx). Nginx itself is not recreated before stage `services` | previous tag | read `$C logs --tail 100 app`, fix, release again |
+| `up` (recreating `app` failed) | old app again, if `rollback.sh` succeeded. If it failed too, a second `[ALERT]` ("rollback of ... failed; the app may be down") and a `failed rollback` line in `deploys.log`: run `rollback.sh` by hand and check `$C ps app` | previous tag | read `$C logs --tail 100 app`, fix, release again |
+| `health` | old app again, if `rollback.sh` succeeded (it recreated `app` and reloaded Nginx); if it failed, as in the row above. Nginx itself is not recreated before stage `services` | previous tag | read `$C logs --tail 100 app`, fix, release again |
 | `services` (Nginx or backup did not start) | the **new** app (healthy); Nginx or backup as the error says | previous tag | `$C ps -a`, `$C logs --tail 50 nginx`; then roll back or fix and deploy again, as for a smoke failure |
 | `smoke` | the **new** app (healthy in its container) | previous tag | below |
 
@@ -102,8 +104,9 @@ under `infra/`.
 
 `saathi.previous-tag` holds the tag that ran before the last **successful** deploy. `rollback.sh` rewrites `IMAGE_TAG`
 in the env file, recreates only `app` (`up -d --no-deps app`; `migrate` does not run), reloads production Nginx so
-it resolves the new container, and appends a `rollback` line to
-`deploys.log`. It does not touch the database, does not wait for health, does not post to Slack and does not change
+it resolves the new container (`nginx -t && nginx -s reload`; on failure a `nginx reload failed` line and one Slack
+`[ALERT]`, and the rollback still exits 0), and appends a `rollback` line to `deploys.log`. It does not touch the
+database, does not wait for health, posts to Slack only on a failed reload, and does not change
 `previous-tag`, so running it twice goes to the same tag. Check afterwards:
 
 ```bash
