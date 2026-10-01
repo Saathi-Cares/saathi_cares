@@ -1,0 +1,7 @@
+# Host crontab for the deploy user: `crontab infra/checks/crontab` (this REPLACES the user's crontab).
+# Needs /srv/saathi/checks to exist before the first run (the log redirect happens before check.sh starts).
+# Times are host local time; the 08:00 digest is 08:00 IST only if the host timezone is Asia/Kolkata (README).
+PATH=/usr/local/bin:/usr/bin:/bin
+*/5 * * * *  /srv/saathi/repo/infra/checks/check.sh >> /srv/saathi/checks/check.log 2>&1
+0 8 * * *    /srv/saathi/repo/infra/checks/check.sh --digest >> /srv/saathi/checks/check.log 2>&1
+0 9 1 * *    /srv/saathi/repo/infra/checks/monthly-report.sh >> /srv/saathi/checks/check.log 2>&1
