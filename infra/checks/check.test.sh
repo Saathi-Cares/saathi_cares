@@ -31,6 +31,13 @@ chmod +x "$tmp/bin/"*
 MSYS2_ARG_CONV_EXCL='/CN=' openssl req -x509 -newkey rsa:2048 -nodes -days 400 -subj "/CN=t" -keyout "$tmp/data/certs/origin-key.pem" -out "$tmp/data/certs/origin.pem" 2>/dev/null
 now=$(date +%s)
 for f in last-backup-ok last-mirror-ok last-restore-test-ok; do echo "$now" > "$tmp/data/backups/state/$f"; done
+backup_ok="ok $now backup 20261001T000000"
+restore_ok="ok $now passed: 1 migrations, dump age 3s, 0 media files compared"
+echo "$backup_ok" > "$tmp/data/backups/state/last-backup-result"
+echo "$restore_ok" > "$tmp/data/backups/state/last-restore-test-result"
+# df prints $FAKE_DF's content when that file exists and is the real df otherwise.
+printf '#!/usr/bin/env bash\nif [ -f "${FAKE_DF:-}" ]; then cat "$FAKE_DF"; else exec %s "$@"; fi\n' "$(command -v df)" > "$tmp/bin/df"
+chmod +x "$tmp/bin/df"
 
 fails=0
 ok() { echo "ok   - $1"; }
@@ -39,7 +46,7 @@ has() { grep -q -- "$1" "$tmp/curl.log"; }
 count() { grep -c -- "$1" "$tmp/curl.log" || true; }
 run() {
   : > "$tmp/curl.log"
-  CURL_LOG="$tmp/curl.log" FAKE_LOGS="$tmp/applogs" PATH="$tmp/bin:$PATH" ENV_FILE="$tmp/env" DATA_ROOT="$tmp/data" \
+  CURL_LOG="$tmp/curl.log" FAKE_LOGS="$tmp/applogs" FAKE_DF="$tmp/dfout" PATH="$tmp/bin:$PATH" ENV_FILE="$tmp/env" DATA_ROOT="$tmp/data" \
     STATE_DIR="$tmp/state" COMPOSE_FILE=/dev/null bash "$here/check.sh" "$@" > "$tmp/out.log" 2>&1
 }
 
@@ -99,5 +106,39 @@ has 'http_p95' && bad "p95 alerted although recent requests are fast" || ok "old
 run
 has 'ALERT\] login_burst: 51 login failures' && ok "login burst alerted" || bad "login burst not alerted: $(cat "$tmp/curl.log")"
 has 'RECOVERED\] http_5xx' && ok "5xx recovery announced" || bad "5xx recovery not announced"
+
+# 8. backup and restore-test results (files written by infra/backup/notify.sh): error -> ALERT with the message, ok -> RECOVERED
+st="$tmp/data/backups/state"
+echo "error $now exit 1 at: pg_dump -Fc --file=\"\$dump\"" > "$st/last-backup-result"
+run
+has 'ALERT\] backup_result: last backup failed at .*exit 1 at: pg_dump' && ok "backup error result alerted with its message" || bad "backup error not alerted: $(cat "$tmp/curl.log")"
+echo "$backup_ok" > "$st/last-backup-result"
+run
+has 'RECOVERED\] backup_result' && ok "backup ok result announced as recovery" || bad "backup recovery not announced: $(cat "$tmp/curl.log")"
+echo "error $now media hash mismatch" > "$st/last-restore-test-result"
+run
+has 'ALERT\] restore_test_result: last restore test failed at .*media hash mismatch' && ok "restore-test error alerted with its message" || bad "restore-test error not alerted: $(cat "$tmp/curl.log")"
+echo "$restore_ok" > "$st/last-restore-test-result"
+run
+has 'RECOVERED\] restore_test_result' && ok "restore-test ok result announced as recovery" || bad "restore-test recovery not announced"
+rm "$st/last-restore-test-result"
+run
+has 'ALERT\] restore_test_result: last restore test: never recorded' && ok "missing result file alerts as never recorded" || bad "missing result file: $(cat "$tmp/curl.log")"
+echo "$restore_ok" > "$st/last-restore-test-result"
+run
+
+# 9. malformed df output -> disk check fails as "df failed" (not a false ok); recovers with the real df
+printf 'Use%%\nnot-a-number\n' > "$tmp/dfout"
+run
+has 'ALERT\] disk_data: df failed' && ok "malformed df output alerted" || bad "malformed df not alerted: $(cat "$tmp/curl.log")"
+rm "$tmp/dfout"
+run
+has 'RECOVERED\] disk_data' && ok "disk recovers with readable df" || bad "disk recovery not announced"
+
+# 10. digest while a mute is active: one [DIGEST] message that names the muted check
+touch "$tmp/state/db_up.mute"
+run --digest
+[ "$(count '\[DIGEST\]')" = 1 ] && has 'muted: db_up' && ok "digest posted during a mute and names it" || bad "digest during mute: $(cat "$tmp/curl.log")"
+rm -f "$tmp/state/db_up.mute"
 
 [ "$fails" -eq 0 ] && echo "check.sh tests passed" || { echo "$fails assertion(s) failed"; exit 1; }

@@ -5,8 +5,11 @@ set -u
 ENV_FILE=${ENV_FILE:-/srv/saathi/.env.prod}
 DATA_ROOT=${DATA_ROOT:-/srv/saathi}
 STATE=${STATE_DIR:-$DATA_ROOT/checks/state}
-COMPOSE=(docker compose -p saathi -f "${COMPOSE_FILE:-/srv/saathi/repo/infra/compose.yaml}" --env-file "$ENV_FILE")
+COMPOSE=(docker compose -p saathi -f "${COMPOSE_FILE:-/srv/saathi/repo/infra/compose.yaml}" --env-file "$ENV_FILE" --profile core)
 mkdir -p "$STATE"
+# env_get, slack_post
+# shellcheck source=../lib/host.sh
+. "$(cd "$(dirname "$0")" && pwd)/../lib/host.sh"
 
 # One run at a time: the 08:00 digest run and the 5-minute run start in the same minute.
 if command -v flock >/dev/null 2>&1; then
@@ -15,9 +18,8 @@ if command -v flock >/dev/null 2>&1; then
 fi
 
 # Only the two variables this script needs are read; the env file is not sourced (it is Compose syntax, not shell).
-env_get() { sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | tail -n1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"; }
-SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-$(env_get SLACK_WEBHOOK_URL)}
-UPTIME_HEARTBEAT_URL=${UPTIME_HEARTBEAT_URL:-$(env_get UPTIME_HEARTBEAT_URL)}
+SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-$(env_get SLACK_WEBHOOK_URL "$ENV_FILE")}
+UPTIME_HEARTBEAT_URL=${UPTIME_HEARTBEAT_URL:-$(env_get UPTIME_HEARTBEAT_URL "$ENV_FILE")}
 
 now=$(date +%s)
 failures=0
@@ -26,11 +28,7 @@ is_int() { case "$1" in '' | *[!0-9]*) return 1 ;; *) return 0 ;; esac; }
 dc() { timeout 60 "${COMPOSE[@]}" "$@"; }
 sql() { dc exec -T postgres psql -U postgres -d saathi -tAc "$1" 2>/dev/null | tr -d '[:space:]'; }
 
-notify() { # level, check, message
-  [ -z "${SLACK_WEBHOOK_URL:-}" ] && return 0
-  curl -sS -m 10 -X POST -H 'Content-type: application/json' \
-    --data "$(jq -cn --arg t "[$1] $2: $3 ($(hostname))" '{text:$t}')" "$SLACK_WEBHOOK_URL" >/dev/null || true
-}
+notify() { slack_post "${SLACK_WEBHOOK_URL:-}" "[$1] $2: $3 ($(hostname))"; } # level, check, message
 is_muted() { # a <check>.mute file younger than 24 h silences that check
   [ -f "$STATE/$1.mute" ] && [ -n "$(find "$STATE/$1.mute" -mmin -1440 2>/dev/null)" ]
 }
@@ -61,6 +59,16 @@ age_check() { # check, statefile, max_seconds, label
   age=$((now - ts))
   if [ "$age" -gt "$3" ]; then report "$1" 1 "$4 is ${age}s old (limit $3)"; else report "$1" 0 "$4 age ${age}s"; fi
 }
+result_check() { # check, statefile, label. One line "<ok|error> <epoch> <message>", written by infra/backup/notify.sh.
+  local status='' ts='' msg=''
+  { read -r status ts msg < "$2"; } 2>/dev/null
+  if ! is_int "$ts"; then report "$1" 1 "$3: never recorded ($2 missing or malformed)"; return; fi
+  case "$status" in
+    ok) report "$1" 0 "$3 ok: $msg" ;;
+    error) report "$1" 1 "$3 failed at $(date -d "@$ts" -Is 2>/dev/null || echo "$ts"): $msg" ;;
+    *) report "$1" 1 "$3: unknown status '$status' in $2" ;;
+  esac
+}
 
 # 1. readiness. Port 3000 is not published on the host, so ask from inside the app container,
 #    as its compose healthcheck does. (Site-down paging is the hosted uptime monitor's job, §14.4.)
@@ -85,6 +93,9 @@ done
 age_check backup_age "$DATA_ROOT/backups/state/last-backup-ok" 25200 "last backup"                # 7 h
 age_check mirror_age "$DATA_ROOT/backups/state/last-mirror-ok" 259200 "developer mirror"          # 3 days
 age_check restore_test_age "$DATA_ROOT/backups/state/last-restore-test-ok" 3024000 "restore test" # 35 days
+# Outcome of the last run. The backup container has no internet, so it records the result and this script alerts.
+result_check backup_result "$DATA_ROOT/backups/state/last-backup-result" "last backup"
+result_check restore_test_result "$DATA_ROOT/backups/state/last-restore-test-result" "last restore test"
 
 # 4. database: reachable, connections, long transactions
 up=$(sql "select 1")

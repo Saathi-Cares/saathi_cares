@@ -7,15 +7,18 @@ on:
     inputs:
       target: { description: 'staging or production', required: true, default: staging }
 permissions: { contents: read, packages: write }
+# Staging and production share one checkout on the VPS (/srv/saathi/repo): one deploy at a time, none cancelled.
+concurrency: { group: vps-deploy, cancel-in-progress: false }
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -24,7 +27,7 @@ jobs:
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="sha-${GITHUB_SHA::12}"; fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           push: true
           tags: ghcr.io/saathi-cares/app:${{ steps.meta.outputs.tag }},ghcr.io/saathi-cares/app:sha-${{ github.sha }}
@@ -35,10 +38,11 @@ jobs:
     if: github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[staging]') || github.event.inputs.target == 'staging')
     runs-on: ubuntu-latest
     environment: staging
+    timeout-minutes: 20
     env:
       DEPLOY_REF: main
     steps:
-      - uses: appleboy/ssh-action@v1
+      - uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -50,11 +54,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.target == 'production'
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 20
     # The tag's own compose files and scripts are deployed, not main's.
     env:
       DEPLOY_REF: ${{ github.ref_name }}
     steps:
-      - uses: appleboy/ssh-action@v1
+      - uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}

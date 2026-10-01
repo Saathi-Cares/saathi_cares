@@ -16,7 +16,7 @@ services:
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
       - ./postgres/init-test-db.sql:/docker-entrypoint-initdb.d/20-test.sql:ro
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.3 # pinned by tag (Dependabot docker-compose keeps it current)
     profiles: ['dev']
     ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
     mem_limit: 64m

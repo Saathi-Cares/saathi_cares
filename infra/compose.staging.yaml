@@ -1,20 +1,23 @@
 # Staging on the VPS: a second project next to production, with smaller limits and no nginx of its own.
 # The prod nginx proxies staging.<domain> to staging-app-1:3000 on the shared saathi_edge network.
 #   docker compose -p staging -f infra/compose.yaml -f infra/compose.staging.yaml \
-#     --env-file /srv/saathi/.env.staging --profile core up -d      (with DATA_ROOT=/srv/saathi-staging)
+#     --env-file /srv/saathi/.env.staging --profile core up -d      (with STAGING_DATA_ROOT=/srv/saathi-staging)
 # Stopped with `down` after UAT. `profiles: !override` because Compose appends profile lists across files.
+# Data lives under STAGING_DATA_ROOT, never DATA_ROOT: an env file copied from the example says DATA_ROOT=/srv/saathi,
+# and staging must not open production's pgdata or media (PLAN.md §15.4).
 services:
   postgres:
     mem_limit: 512m
     volumes: !override
-      - ${DATA_ROOT}/pgdata:/var/lib/postgresql/data
+      - ${STAGING_DATA_ROOT:?set in .env.staging}/pgdata:/var/lib/postgresql/data
       - ./postgres/postgresql-small.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
   app:
     mem_limit: 512m
     environment:
       LOG_LEVEL: debug
-    networks: [internal, edge]
+    volumes: !override
+      - ${STAGING_DATA_ROOT:?set in .env.staging}/media:/data/media
   nginx:
     profiles: !override ['never']
   backup:

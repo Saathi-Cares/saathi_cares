@@ -116,13 +116,14 @@ services:
       PGDATABASE: saathi
       RESTIC_REPOSITORY: /backups/restic
       RESTIC_PASSWORD: ${RESTIC_PASSWORD:?set in the env file passed with --env-file}
-      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
     volumes:
       - ${DATA_ROOT:-/srv/saathi}/backups:/backups
       - ${DATA_ROOT:-/srv/saathi}/media:/data/media:ro
     depends_on:
       postgres: { condition: service_healthy }
     mem_limit: 128m
+    # Internal only: this container holds the superuser and restic passwords, so it gets no internet. Results go to
+    # backups/state/last-*-result, which infra/checks/check.sh on the host reports (backup_result, restore_test_result).
     networks: [internal]
 
 # `internal: true` makes the database network unreachable from outside Docker; only nginx publishes ports.

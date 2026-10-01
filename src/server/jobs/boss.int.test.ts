@@ -58,7 +58,8 @@ describe('jobs', () => {
     await waitFor(() =>
       logLines.some((l) => l.includes(`"job_id":"${id}"`) && l.includes('"msg":"job done"')),
     );
-  });
+    // Two sequential waits of up to 15 s each: above the 20 s default, so waitFor's own timeout message wins.
+  }, 35_000);
 
   it('does not enqueue when the surrounding transaction rolls back', async () => {
     const marker = `rolled-back-${randomUUID()}`; // unique, so rows from earlier runs cannot mask or fake the result

@@ -13,7 +13,6 @@ tag=${2:-$(cat "/srv/saathi/$name.previous-tag")}
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$tag/" "$envf"
 # shellcheck disable=SC2086
 docker compose -p "$name" $files --env-file "$envf" --profile core up -d --no-deps app
-if [ "$project" = staging ]; then
-  docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T nginx nginx -s reload || true
-fi
+# Nginx resolves app (and staging-app-1) only at start or reload; the recreated container may have a new address.
+docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod --profile core exec -T nginx nginx -s reload || true
 echo "$(date -Is) rollback $project -> $tag" >> /srv/saathi/deploys.log

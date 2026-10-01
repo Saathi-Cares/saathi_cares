@@ -250,8 +250,10 @@ In the Cloudflare dashboard for `saathiventures.com`:
   The database passwords take effect only on the **first** start of an empty `pgdata` (`infra/postgres/init.sql`).
   Changing them later needs `ALTER ROLE` as well (`breach-response.md`).
 
-- [ ] Staging, the same way, into `/srv/saathi/.env.staging` (mode 600) with **different** passwords and
-  `DATA_ROOT=/srv/saathi-staging`. `RESTIC_PASSWORD` must be set to some random value even though staging has no
+- [ ] Staging, the same way, into `/srv/saathi/.env.staging` (mode 600) with **different** passwords, and uncomment
+  `STAGING_DATA_ROOT=/srv/saathi-staging`: `infra/compose.staging.yaml` mounts staging's `pgdata` and `media` from it
+  (never from `DATA_ROOT`), Compose refuses the staging files without it, and `deploy-remote.sh staging` refuses when
+  it is unset or equals `DATA_ROOT` or `/srv/saathi`. Leave `DATA_ROOT` as it is. `RESTIC_PASSWORD` must be set to some random value even though staging has no
   backup service: Compose checks every `${VAR:?}` in `compose.yaml` before it applies profiles. Uncomment
   `SMOKE_BASIC_AUTH=<staging-user>:<password>` (step 5's pair; hex characters only, the value is passed to curl in a
   quoted config line). `SLACK_WEBHOOK_URL` may be the same channel.
@@ -296,9 +298,9 @@ In the Cloudflare dashboard for `saathiventures.com`:
   Run the first backup and the restore test by hand:
 
   ```bash
-  $C exec backup backup.sh          # ends with "backup ok <stamp>"
-  $C exec backup restore-test.sh    # ends with "restore test passed: ..."
-  ls -l /srv/saathi/backups/state/  # last-backup-ok, last-restore-test-ok, last-dump-kb
+  $C exec backup backup.sh          # ends with "[ok] backup: backup <stamp>"
+  $C exec backup restore-test.sh    # ends with "[ok] restore-test: passed: ..."
+  ls -l /srv/saathi/backups/state/  # last-backup-ok, last-restore-test-ok, last-dump-kb, last-backup-result, last-restore-test-result
   ```
 
   From then on the container's own crontab runs `backup.sh` at 00:15, 06:15, 12:15 and 18:15 IST and

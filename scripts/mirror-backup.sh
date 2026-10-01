@@ -13,5 +13,7 @@ export RESTIC_REPOSITORY="$LOCAL"
 export RESTIC_FROM_REPOSITORY="sftp:$VPS_HOST:/srv/saathi/backups/restic" RESTIC_FROM_PASSWORD="$RESTIC_PASSWORD"
 restic copy
 restic check --quiet
+# The timestamp is the client's on purpose: it records when this machine finished the copy.
+# shellcheck disable=SC2029
 ssh "$VPS_HOST" "echo $(date +%s) > /srv/saathi/backups/state/last-mirror-ok"
 echo "mirror ok $(date -Is)"

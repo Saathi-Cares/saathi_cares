@@ -4,7 +4,7 @@
 #   since: a Docker duration or timestamp, default 2h (e.g. 30m, 24h, 2026-10-01T08:00:00Z)
 set -eu
 ENV_FILE=${ENV_FILE:-/srv/saathi/.env.prod}
-C=(docker compose -p saathi -f "${COMPOSE_FILE:-/srv/saathi/repo/infra/compose.yaml}" --env-file "$ENV_FILE")
+C=(docker compose -p saathi -f "${COMPOSE_FILE:-/srv/saathi/repo/infra/compose.yaml}" --env-file "$ENV_FILE" --profile core)
 usage() { echo "usage: logq.sh errors [since] | request <id> | slow [since] | login-failures [since]" >&2; exit 1; }
 [ $# -ge 1 ] || usage
 since=${2:-2h}

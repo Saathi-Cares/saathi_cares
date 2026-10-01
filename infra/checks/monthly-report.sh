@@ -2,9 +2,11 @@
 # Posts one Slack message on the 1st of each month (PLAN.md §14.2). Run from infra/checks/crontab.
 set -u
 ENV_FILE=${ENV_FILE:-/srv/saathi/.env.prod}; DATA_ROOT=${DATA_ROOT:-/srv/saathi}
-env_get() { sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | tail -n1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"; }
-SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-$(env_get SLACK_WEBHOOK_URL)}
-C=(docker compose -p saathi -f "${COMPOSE_FILE:-/srv/saathi/repo/infra/compose.yaml}" --env-file "$ENV_FILE")
+# env_get, slack_post
+# shellcheck source=../lib/host.sh
+. "$(cd "$(dirname "$0")" && pwd)/../lib/host.sh"
+SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-$(env_get SLACK_WEBHOOK_URL "$ENV_FILE")}
+C=(docker compose -p saathi -f "${COMPOSE_FILE:-/srv/saathi/repo/infra/compose.yaml}" --env-file "$ENV_FILE" --profile core)
 q() { timeout 60 "${C[@]}" exec -T postgres psql -U postgres -d saathi -tA -c "$1" 2>/dev/null; }
 joined() { paste -sd "$1" -; } # rows on one line, separated by $1
 restore_ts=$(tr -d '[:space:]' < "$DATA_ROOT/backups/state/last-restore-test-ok" 2>/dev/null)
@@ -25,7 +27,5 @@ Last restore test passed: $restore_line
 Reminder: check https://www.cloudflare.com/ips/ against infra/nginx/snippets/cloudflare-real-ip.conf
 EOF
 )
-if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-  curl -sS -m 10 -X POST -H 'Content-type: application/json' --data "$(jq -cn --arg t "$report" '{text:$t}')" "$SLACK_WEBHOOK_URL" >/dev/null || true
-fi
+slack_post "${SLACK_WEBHOOK_URL:-}" "$report"
 echo "$report"

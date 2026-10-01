@@ -2,6 +2,8 @@
 
 Status: **draft for review, revision 5** (clinical model rewritten; simplified after the three-model council review in §22; product owner's answers applied in §20.1; oral cancer and tobacco cessation programmes, AI screening phase and engineering standards added 2026-09-29; patient engagement — AI intake call and WhatsApp reminders — added as Phase 6 on the founder's request, 2026-09-29) · Author: Abhinav Goyal with Claude · First draft 2026-09-28, revised 2026-09-29 · Supersedes: `ARCHITECTURE_AUDIT.md` §12 (next steps)
 
+rev 5.1 (2026-10-01): wording aligned with the Phase 0B code (§11, §14.1, §15.2–§15.4; no decision changed).
+
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
@@ -998,20 +1000,20 @@ Frontend nav hides what the user cannot do. That is convenience only; the API an
 | Layer | Control | Where |
 | --- | --- | --- |
 | Edge | DDoS absorption, WAF managed rules, bot challenge on `/login`, `/contact`, `/donate` | Cloudflare (optional) |
-| Nginx | TLS 1.2+ only, HSTS preload, OCSP stapling; `client_max_body_size 2m` (25m on `/api/v1/media`); `limit_req` zones per route; block `/.git`, `/.env`; hide server tokens | `infra/nginx/*` |
+| Nginx | TLS 1.2+ only, HSTS preload (no OCSP stapling: the origin has a Cloudflare Origin CA certificate and Cloudflare is its only client); `client_max_body_size 2m` (25m on `/api/v1/media`); `limit_req` zones per route; block `/.git`, `/.env`; hide server tokens | `infra/nginx/*` |
 | Headers | `Content-Security-Policy` (nonce-based scripts, `img-src 'self' media.<domain>`, `frame-ancestors 'none'`, `connect-src 'self' api.razorpay.com`), `X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation self only) | `next.config.ts` headers + Nginx |
 | CSRF | SameSite=Lax cookie + `Origin`/`Sec-Fetch-Site` check on every non-GET in `proxy.ts`; JSON-only bodies for API | app |
 | Input | zod on every boundary; `.strict()` objects; string length caps; phone/email normalisation; HTML in CMS rich text sanitised with an allowlist (DOMPurify server-side) | app |
 | Injection | Drizzle parameterised queries only; raw SQL forbidden by lint except in `migrations/` | app |
 | AuthN | argon2id, throttling, lockout, MFA, session revocation, secure cookies | §10 |
 | AuthZ | permission check in handler wrapper + row-level scope in services; tests assert 403 for every endpoint × role matrix | §10, §17 |
-| Secrets | `.env` files outside the repo (`/srv/saathi/.env.prod`, mode 600); GitHub Actions secrets for CI; `gitleaks` pre-commit and CI; `config.ts` fails boot on missing/invalid vars; `NEXT_PUBLIC_*` limited to gateway public key and site URL | §15, §16 |
+| Secrets | `.env` files outside the repo (`/srv/saathi/.env.prod`, mode 600); GitHub Actions secrets for CI; `gitleaks` in CI; `config.ts` fails boot on missing/invalid vars; `NEXT_PUBLIC_*` limited to gateway public key and site URL | §15, §16 |
 | PHI in logs | logger redaction list derived from the schema tier annotations (§8.9): all T2/T3 fields including `phone`, `address`, `medical_history`, `dental_history`, `checklist`, `result`, `clinical_findings`, `medications`, `content_summary`; request logs carry ids not payloads; CI log-grep test | `observability/logger.ts` |
 | Uploads | multipart through the app with size and MIME limits at Nginx and in the handler; MIME sniffed server-side; images re-encoded by sharp (strips metadata/EXIF GPS); private files served only through short signed URLs | §8.3 |
 | Webhooks | HMAC signature verification, event id dedup, replay window check, processing inside transaction | §13.3 |
 | Payments | no card data touches our servers (gateway-hosted checkout); amounts trusted only from verified webhook/API fetch, never from the browser | §18 Phase 4 |
 | Database | separate roles (§8.8), no superuser at runtime, `DELETE` withheld on protected tables, TLS between containers unnecessary (private network) but `password_encryption = scram-sha-256` | `infra/postgres/init.sql` |
-| Containers | non-root user, read-only root FS for app (`.next/cache` and `/tmp` writable), `no-new-privileges`, only Nginx publishes ports, images pinned by digest, Trivy scan nightly (non-blocking, reviewed weekly) | `Dockerfile`, compose |
+| Containers | non-root user, read-only root FS for app (`.next/cache` and `/tmp` writable), `no-new-privileges`, only Nginx publishes ports, images pinned by tag (digests from Phase 7), Trivy scan nightly (non-blocking, reviewed weekly) | `Dockerfile`, compose |
 | Host | SSH keys only, fail2ban, ufw (22/80/443), unattended security upgrades, Docker socket not exposed | runbook `docs/runbooks/host-setup.md` |
 | Dependencies | Dependabot monthly, grouped; `npm audit --audit-level=high` nightly; lockfile committed | `.github/*` |
 | Backups | encrypted at rest (restic), every 6 h to a separate VPS volume, mirrored to the developer's machine, monthly tested restore, keys held by the developer with a sealed copy at the organisation | §15.5, D24 |
@@ -1144,7 +1146,7 @@ v1 principle (D19): know within five minutes when the site is down, when a backu
 ### 14.1 Logs
 
 - pino JSON to stdout; fields: `time, level, request_id, user_id (never email), route, status, duration_ms, msg`; redaction list derived from the §8.9 tier annotations.
-- Docker `json-file` driver, `max-size 50m`, `max-file 10` per container (roughly 30 days at expected volume). Nginx access logs in JSON, rotated by logrotate, 30 days.
+- Docker `json-file` driver, `max-size 50m`, `max-file 10` per container (roughly 30 days at expected volume). Nginx access logs in JSON to stdout, kept by the same `json-file` driver.
 - Querying: `docker logs app --since 2h | jq 'select(.level >= 50)'`. `infra/checks/logq.sh` wraps the common questions: errors by route, everything for one request id, login failures by IP, slowest requests.
 - Every response carries `X-Request-Id`; support asks users for it.
 
@@ -1189,7 +1191,7 @@ One VPS, the cheapest that meets the spec: 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS, I
 
 There is no backup host in v1 (D24). The restic repository lives on the attached volume and is mirrored to the developer's machine; the same VPS runs the monthly restore test in a throwaway container.
 
-### 15.2 Containers (`infra/compose.yaml`, profiles: `core`, `dev`, `staging`, `observability`)
+### 15.2 Containers (`infra/compose.yaml`, profiles: `core`, `dev`, `observability`; staging is `-p staging --profile core` with `infra/compose.staging.yaml`)
 
 | Service | Image | Profile | Memory limit | Notes |
 | --- | --- | --- | --- | --- |
@@ -1197,23 +1199,23 @@ There is no backup host in v1 (D24). The restic repository lives on the attached
 | `app` | ghcr.io/saathi-cares/app:<sha> | core | 768 MB | Next.js standalone + in-process pg-boss consumer; non-root; read-only root FS with `.next/cache` and `/tmp` writable; media volume mounted; healthcheck `/api/health/ready` |
 | `migrate` | same image, `node migrate.js` | core (one-shot) | 256 MB | runs with `saathi_owner` before `app` (`depends_on: condition: service_completed_successfully`); keeps owner credentials out of the app container |
 | `postgres` | postgres:16 | core | 1.5 GB | volume `pgdata` on the encrypted volume; `postgresql.conf` from repo; `init.sql` creates roles and extensions |
-| `backup` | custom (postgres client + restic + cron) | core | 128 MB | `pg_dump` every 6 h + media directory → restic repository on the attached volume; exposes the repository read-only over SSH for the developer-machine mirror; also runs disk and backup-age checks so they work if the app is down |
+| `backup` | custom (postgres client + restic + cron) | core | 128 MB | `pg_dump` every 6 h + media directory → restic repository on the attached volume; internal network only (no internet); records each backup and restore-test outcome in a state file. The developer-machine mirror reads the repository over the host's SSH, and the disk, backup-age and backup-result checks run in `infra/checks/check.sh` on the host |
 | `ai-inference` | custom Python image (FastAPI + ONNX Runtime CPU), models mounted read-only | core from Phase 5 | 1 GB | internal network only; `GET /v1/health`, `POST /v1/analyse`; scaled to 0 replicas until a validated model is deployed |
 | `mailpit` | axllent/mailpit | dev | 64 MB | catches all dev and staging email at `localhost:8025` |
 | `prometheus`, `grafana`, `postgres_exporter`, `node_exporter` | official | observability (not in the repo until the §19 trigger) | ~600 MB total | added and enabled at the §19 trigger; Grafana behind Nginx `/grafana` with auth and IP allowlist |
 
-Resident memory budget with `core` only: about 2.6 GB including the OS, leaving room for a `staging` project to be started on demand. Networks: `edge` (nginx ↔ app), `internal` (app/migrate/backup ↔ postgres); only nginx is on both. Every service has a memory limit so one runaway container cannot take the box down.
+Resident memory budget with `core` only: about 2.6 GB including the OS, leaving room for a `staging` project to be started on demand. Networks: `edge` (nginx ↔ app), `internal` (app/migrate/backup ↔ postgres); `app` is on both, `nginx` on `edge` only. Every service has a memory limit so one runaway container cannot take the box down.
 
 ### 15.3 Dockerfile
 
-Multi-stage as in the Next.js self-hosting reference: `deps` → `builder` (`next build` with `output: 'standalone'`) → `runner` (copies `standalone`, `static`, `public`, `worker.js`, `migrate.js`; `USER nextjs`). Image about 180 MB. Build args carry only public values; secrets are runtime env. Images tagged `<git-sha>` and `latest`, pinned by digest in the prod compose file.
+Multi-stage as in the Next.js self-hosting reference: `deps` → `builder` (`next build` with `output: 'standalone'`) → `runner` (copies `standalone`, `static`, `public`, `worker.js`, `migrate.js`; `USER nextjs`). Image about 180 MB. Build args carry only public values; secrets are runtime env. Images tagged `sha-<git-sha>` and the release tag `v*`; the compose file pins images by tag, digest pinning from Phase 7.
 
 ### 15.4 Environments
 
 | Env | Where | Data | Purpose |
 | --- | --- | --- | --- |
 | `dev` | developer laptop, `docker compose --profile dev up` for Postgres and Mailpit; `npm run dev` on the host for hot reload | synthetic seed (`scripts/seed`) | daily work |
-| `staging` | same VPS, second compose project (`-p staging`, profile `staging`, small limits) **started on demand** for UAT and stopped afterwards | synthetic seed only, **never a copy of production**; the earlier idea of an anonymised production dump was cut because the anonymiser is itself a PHI-handling risk | UAT by SaathiCares staff before each release; pilot rehearsals |
+| `staging` | same VPS, second compose project (`-p staging --profile core` with `infra/compose.staging.yaml`, small limits) **started on demand** for UAT and stopped afterwards | synthetic seed only, **never a copy of production**; the earlier idea of an anonymised production dump was cut because the anonymiser is itself a PHI-handling risk | UAT by SaathiCares staff before each release; pilot rehearsals |
 | `prod` | VPS | real | deployed from a Git tag `v*` |
 
 Config is env-only (`src/server/config.ts`, zod-validated). `.env.example` is the complete list with comments; the app refuses to boot if anything required is missing or malformed. Production env files live at `/srv/saathi/.env.prod`, mode 600, outside the repo.

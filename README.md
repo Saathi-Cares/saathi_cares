@@ -2,7 +2,7 @@
 
 Dental EMR and public website for Saathi Cares (SHC Foundation). Plan and decisions: `PLAN.md`.
 
-Phase 0A is built: the public pages and the server foundation. There is no login, no admin and no patient data yet.
+Phase 0A (the public pages and the server foundation) is built. Phase 0B code (Docker images, Compose stacks, Nginx, backups, host checks, CI and deploy workflows, runbooks) is in the repository; nothing is deployed. Task 8 of the Phase 0B plan, run by the owner, sets up the VPS, Slack, the uptime monitor and the developer-machine mirror. There is no login, no admin and no patient data yet.
 
 ## Run it locally (10 minutes)
 
@@ -56,16 +56,23 @@ src/content/    site.ts, the static public-site content (replaced by the CMS in 
 src/server/     backend: config, db, http, jobs, observability, storage, health (see src/server/README.md)
 e2e/            Playwright smoke tests
 infra/          Compose files (compose.yaml production, compose.dev.yaml laptop, compose.staging.yaml, compose.local.yaml local verification only) and postgres/ init and config
+infra/nginx/    the TLS edge: nginx.conf, conf.d/ (production and staging servers), snippets/ (real IP, rate limits, headers, proxy)
+infra/backup/   the backup container: pg_dump + restic every 6 h, the monthly restore test, result files for check.sh
+infra/checks/   host scripts: check.sh (5-minute checks and alerts), logq.sh, monthly-report.sh, the harness check.test.sh
+infra/lib/      host.sh, helpers sourced by the host scripts
+scripts/        deploy-remote.sh, rollback.sh, mirror-backup.sh/.ps1, dev-cert.sh
+.github/        workflows (ci, deploy, nightly) and Dependabot
 docs/           API and internal changelogs, ADR index, council reviews, phase plans
+docs/runbooks/  host setup, deploy and rollback, disaster recovery, breach response, key envelope
 ```
 
-## What exists today (Phase 0A)
+## What the app does today
 
 - Public pages `/`, `/contact` and `/donate`, prerendered at build time from `src/content/site.ts`. The home page sections are server components with CSS-only entrance animations (no framer-motion): the Hero uses `tailwindcss-animate` classes, the other sections the `.enter` class in `app/globals.css` through the `<Enter delay>` component; both run once on page load and are off for users who prefer reduced motion. All public copy, the contact details, the navigation links and the JSON-LD come from `src/content/site.ts`. Of the page components, only the Header is a client component (scroll state and the mobile menu). It links only to routes that exist: no portal or login links. The contact page lists the email address, office address and working hours, and has no form; no phone number is published. The donate page says online donations are not available yet. Unknown URLs get a 404 page inside the site header and footer.
 - `GET /api/health` returns `{ "status": "alive" }`. `GET /api/health/ready` returns `{ ok, checks: { database, storage, jobs } }` with 200 when every check is `ok`, otherwise 503.
 - Server foundation in `src/server/`: config validation, JSON logs with redaction, the error taxonomy, the `withHandler` route wrapper, the SQL migration runner, local file storage, and an in-process pg-boss consumer with one test-only job. `withHandler` is exercised by its unit tests; no route uses it yet.
 
-## Known limitations (Phase 0A)
+## Known limitations
 
 - No admin, no login, no forms.
 - Mobile Lighthouse performance measured 84–87 on a bare `next start`. The ≥ 90 target is re-measured behind Nginx and Cloudflare at Phase 0 exit.
@@ -85,12 +92,26 @@ Code in the repository that no route, script or test uses today (PLAN.md §23.6)
 | `enqueue()` (`src/server/jobs/boss.ts`) | The job queue's producer side; only `boss.int.test.ts` calls it | Phase 1 (email and SMS jobs) |
 | `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `InvalidTransitionError` in `src/server/http/errors.ts` | Part of the PLAN.md §9.7 taxonomy | Used from Phase 1 (auth, RBAC, stage machines) |
 
-No infrastructure service is dormant: the only external service is Postgres, which the readiness check, the migration runner and the job queue all use.
+External services the Phase 0B code depends on. None is set up yet; Task 8 (owner) sets them up:
+
+| Service | Used by | Status |
+| --- | --- | --- |
+| VPS (Docker host) | everything under `infra/` and `scripts/` | not provisioned |
+| Cloudflare (DNS, proxy, Origin CA certificate) | Nginx, `deploy-remote.sh` smoke test | not configured |
+| GitHub Container Registry | `deploy.yml` pushes the image; the VPS pulls it | no image pushed (nothing pushed to GitHub) |
+| GitHub Actions and environments | `ci.yml`, `deploy.yml`, `nightly.yml` | never run |
+| Slack incoming webhook | `check.sh`, `monthly-report.sh`, `deploy-remote.sh` | not created |
+| Hosted uptime monitor | checks `/api/health/ready` and receives the `check.sh` heartbeat | vendor not chosen |
+| restic mirror on the developer machine | `scripts/mirror-backup.*` | not set up |
+
+Postgres runs inside the Compose stack; the readiness check, the migration runner and the job queue all use it.
 
 ## Operations
 
-- Deploy: tag `vX.Y.Z` → GitHub Actions (`deploy.yml`) builds the image → approval on the `production` environment → `scripts/deploy-remote.sh prod vX.Y.Z` on the VPS (migrate, health wait with automatic rollback, smoke test through Cloudflare, Slack notice). Staging: `[staging]` in the commit message on `main`, or a manual run. Roll back: `scripts/rollback.sh prod`. Details: `docs/runbooks/deploy-and-rollback.md`.
-- Health: `infra/checks/check.sh` from the `deploy` user's crontab every 5 min → Slack on each failure and recovery, a digest at 08:00 and a monthly report; a hosted uptime monitor checks `/api/health/ready` and expects the `check.sh` heartbeat. Details: `infra/checks/README.md`.
-- Backups: every 6 h (00:15, 06:15, 12:15, 18:15 IST) to `/srv/saathi/backups/restic`, mirrored to the developer's machine daily, restore-tested monthly (03:30 IST on the 1st). `docs/runbooks/disaster-recovery.md`.
+What the scripts do once Task 8 has installed them on a VPS (none of this runs today):
+
+- Deploy: a `vX.Y.Z` tag makes GitHub Actions (`deploy.yml`) build the image, wait for approval on the `production` environment, then run `scripts/deploy-remote.sh prod vX.Y.Z` on the VPS. That script runs `migrate` as a one-off container (a failed migration leaves the running app untouched), recreates only `app`, waits for it to be healthy (rolling back to the previous tag if it is not), starts the other services, reloads Nginx, runs a smoke test through Cloudflare and posts to Slack. Staging: `[staging]` in the commit message on `main`, or a manual run. Roll back: `scripts/rollback.sh prod`. Details: `docs/runbooks/deploy-and-rollback.md`.
+- Health: `infra/checks/check.sh`, from the `deploy` user's crontab every 5 min, posts to Slack on each failure and recovery, a digest at 08:00 and a monthly report, and pings the uptime monitor's heartbeat; the monitor also checks `/api/health/ready`. Details: `infra/checks/README.md`.
+- Backups: the `backup` container backs up to `/srv/saathi/backups/restic` every 6 h (00:15, 06:15, 12:15, 18:15 IST) and runs a restore test monthly (03:30 IST on the 1st); it records each outcome in a result file that `check.sh` alerts on. `scripts/mirror-backup.*` copies the repository to the developer's machine, daily once scheduled. `docs/runbooks/disaster-recovery.md`.
 - Logs: `infra/checks/logq.sh errors [since]`, `logq.sh request <id>`, `logq.sh slow [since]`, `logq.sh login-failures [since]` (`since` defaults to `2h`).
 - Runbooks in `docs/runbooks/`: `host-setup.md` (new VPS, step by step), `deploy-and-rollback.md`, `disaster-recovery.md`, `breach-response.md`, `key-envelope.md` (the printed page for the founder's sealed envelope).

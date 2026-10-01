@@ -20,7 +20,7 @@ Its location: ______________________________ (fill in by hand on the printed cop
 
 | What | How | Where | When |
 | --- | --- | --- | --- |
-| Database `saathi` | `pg_dump -Fc --no-owner`, checked for `schema_migrations`, then `restic backup --tag db` | `/srv/saathi/backups/restic` on the VPS | 00:15, 06:15, 12:15, 18:15 IST (`infra/backup/crontab`) |
+| Database `saathi` | `pg_dump -Fc`, checked for `schema_migrations`, then `restic backup --tag db` | `/srv/saathi/backups/restic` on the VPS | 00:15, 06:15, 12:15, 18:15 IST (`infra/backup/crontab`) |
 | Media (`/srv/saathi/media`) | `restic backup --tag media` | same repository | with every database backup |
 | The repository itself | `restic copy` by `scripts/mirror-backup.ps1` (Windows) or `scripts/mirror-backup.sh` | `%USERPROFILE%\saathi-backups\restic` on the developer machine | daily, Task Scheduler (`host-setup.md` step 9) |
 
@@ -31,22 +31,28 @@ Retention (`infra/backup/backup.sh`, PLAN.md §15.5): database and media snapsho
 The repository is encrypted with `RESTIC_PASSWORD` (in `/srv/saathi/.env.prod` and in the key envelope). Without it the
 backups cannot be read by anyone, including us. The mirror uses the same passphrase.
 
-`pg_dump --no-owner` has no effect on a custom-format (`-Fc`) archive: the dump keeps object ownership
-(`saathi_owner` for the tables, `saathi_app` for the pg-boss schema the app creates). The restores below therefore run
+The custom-format (`-Fc`) dump keeps object ownership (`saathi_owner` for the tables, `saathi_app` for the pg-boss
+schema the app creates). The restores below therefore run
 `pg_restore` as `postgres` **without** `--no-owner`, so owners and grants come back as they were.
 (`restore-test.sh` uses `--no-owner` because its scratch database only has to prove the dump is readable.)
 
 ## Health signals
 
 State files in `/srv/saathi/backups/state/` hold the epoch seconds of the last success; `check.sh` alerts when one is
-stale.
+stale. The backup container is on the internal network only and cannot reach Slack, so it also writes the outcome of
+every run to a result file, one line `<ok|error> <epoch> <message>` (`infra/backup/notify.sh`), and `check.sh` on the
+host alerts on an `error` and announces the next `ok` as a recovery.
 
 - `last-backup-ok`: written by `backup.sh`; alert after 7 h.
 - `last-restore-test-ok`: written by `restore-test.sh` (monthly, 03:30 IST on the 1st) only on a pass; alert after 35 days.
 - `last-mirror-ok`: written over SSH by the mirror script on the developer machine; alert after 3 days.
+- `last-backup-result`, `last-restore-test-result`: the last run's outcome; check `backup_result` and
+  `restore_test_result`. An `error` names the failed step: an explicit refusal (below) or, for any other failing
+  command, `exit <code> at: <command>`. A missing file alerts as "never recorded".
 
-`backup.sh` refuses to start (exit 2, Slack `ERROR`) when `/backups` has less free space than twice the last dump plus
-50 MB. A failing step stops the run; the reason is in `$C logs backup`.
+`backup.sh` refuses to start (exit 2, `error` in `last-backup-result`, so `check.sh` alerts `backup_result` within 5
+minutes) when `/backups` has less free space than twice the last dump plus 50 MB. Any other failing step stops the run
+and records `error` with that command; the full output is in `$C logs backup`.
 
 ## Manual commands
 
@@ -73,12 +79,18 @@ Details and limits: `deploy-and-rollback.md`. Stop here if that fixes it.
 Start a clock and write each time in the rehearsal table. Every write since the chosen snapshot is lost, so first
 decide with the owner which snapshot to use: the newest one taken **before** the damage.
 
-1. Take one more backup of the current (damaged) state, so nothing is lost for good, and list the snapshots:
+1. Take one more backup of the current (damaged) state. It is kept for forensics and for recovering individual
+   records later; it is **not** what you restore, and from now on it is the newest snapshot, so never use `latest`
+   below. Then list both kinds of snapshot:
 
    ```bash
    $C exec backup backup.sh
    $C exec backup restic snapshots --tag db
+   $C exec backup restic snapshots --tag media
    ```
+
+   Each backup run makes one `db` and one `media` snapshot, a few minutes apart. With the owner, choose the run to
+   restore (the newest one before the damage) and write down its `<db-snapshot-id>` and `<media-snapshot-id>`.
 
 2. Restore the chosen dump inside the backup container. It has `restic`, `pg_restore` and `psql`, and reaches
    `postgres` as the superuser through `PGHOST`, `PGUSER` and `PGPASSWORD` (`infra/compose.yaml`):
@@ -86,7 +98,7 @@ decide with the owner which snapshot to use: the newest one taken **before** the
    ```bash
    $C exec backup bash
    # inside the container:
-   restic restore <snapshot-id> --target /backups/restore     # or: restic restore latest --tag db --target /backups/restore
+   restic restore <db-snapshot-id> --target /backups/restore
    ls /backups/restore/backups/dumps/                          # saathi-<stamp>.dump
    psql -d postgres -c "create database saathi_restore owner saathi_owner"
    psql -d postgres -c "grant connect, create on database saathi_restore to saathi_app"
@@ -114,11 +126,11 @@ decide with the owner which snapshot to use: the newest one taken **before** the
    `check.sh` may alert during the minute in which `saathi` does not exist or the app is stopped; mute it beforehand
    if you prefer (`touch /srv/saathi/checks/state/<check>.mute`, `infra/checks/README.md`).
 
-4. Media, only if files were damaged or deleted. The container mounts media read-only, so restore under `/backups`
-   and copy on the host:
+4. Media, only if files were damaged or deleted, from the same run as the database. The container mounts media
+   read-only, so restore under `/backups` and copy on the host:
 
    ```bash
-   $C exec backup restic restore latest --tag media --target /backups/restore-media
+   $C exec backup restic restore <media-snapshot-id> --target /backups/restore-media
    sudo cp -a /srv/saathi/backups/restore-media/data/media/. /srv/saathi/media/
    sudo chown -R 1001:1001 /srv/saathi/media
    ```

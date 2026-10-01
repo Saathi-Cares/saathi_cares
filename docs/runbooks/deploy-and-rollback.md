@@ -26,16 +26,23 @@ What `deploy-remote.sh prod <tag>` does, in order:
    **successful** deploy (`/srv/saathi/saathi.previous-ref`) that contains `-- DESTRUCTIVE`. If that file is missing it
    scans all migrations. Appends a `deploy` line to `/srv/saathi/deploys.log`.
 3. Remembers the current `IMAGE_TAG` and rewrites `IMAGE_TAG=<tag>` in `/srv/saathi/.env.prod`.
-4. `pull app`; for a destructive migration, `backup.sh` in the running backup container; then `up -d --remove-orphans`.
-   Compose runs `migrate` first and recreates `app` only if `migrate` exits 0.
-5. Waits up to 150 s (30 × 5 s) for the `app` container to be `healthy`. If it is not: Slack `[ALERT]`, then
+4. `pull app`; for a destructive migration, `backup.sh` in the running backup container.
+5. `run --rm migrate`: the migrations run in a one-off container (it starts only `postgres`). The running `app` is not
+   touched, so a failed migration ends the deploy with the old app still serving.
+6. `up -d --no-deps app`: only `app` is recreated on the new image. If that fails: Slack `[ALERT]`, then
    `rollback.sh prod <previous tag>`, exit 1.
-6. Smoke test through the edge: `curl -fsS --max-time 10 https://cares.saathiventures.com/api/health/ready`, up to 12
+7. Waits up to 150 s (30 × 5 s) for the `app` container to be `healthy`. If it is not: Slack `[ALERT]`, then
+   `rollback.sh prod <previous tag>`, exit 1.
+8. `up -d --remove-orphans` for everything else (Nginx and backup; Nginx waits for a healthy `app`, which it now has).
+   `migrate` runs once more here and finds nothing to apply. Then `nginx -s reload`: Nginx resolves `app` only at start
+   or reload, and the recreated container can have a new address (without the reload it answered 502 in a local test).
+9. Smoke test through the edge: `curl -fsS --max-time 10 https://cares.saathiventures.com/api/health/ready`, up to 12
    tries 5 s apart. Appends a `smoke` line to `deploys.log`.
-7. Only when the smoke test passes: writes the previous tag to `/srv/saathi/saathi.previous-tag` and the deployed
+10. Only when the smoke test passes: writes the previous tag to `/srv/saathi/saathi.previous-tag` and the deployed
    commit to `saathi.previous-ref`, appends an `ok` line, posts `deployed <tag> to prod`, exit 0.
 
-**Any failure** (checkout, pull, pre-deploy backup, `migrate`, the health wait, the smoke test) ends in an exit trap
+**Any failure** (checkout, pull, pre-deploy backup, `migrate`, recreating `app`, the health wait, starting the other
+services, the smoke test) ends in an exit trap
 that puts the previous `IMAGE_TAG` back in the env file and appends
 `failed <env> <tag> at <stage> (exit <code>); IMAGE_TAG restored to <previous>` to `deploys.log`. `previous-tag` and
 `previous-ref` are left untouched, so they still describe the last good deploy, and the next deploy's destructive check
@@ -44,8 +51,10 @@ again covers every migration since then. Each failure posts one Slack `[ALERT]`.
 | Failed at | Running afterwards | Env file `IMAGE_TAG` | What to do |
 | --- | --- | --- | --- |
 | `checkout`, `pull`, `backup` | old app, untouched | previous tag | read the Actions log, fix, run the deploy again |
-| `up` (`migrate` failed) | old app, untouched (Compose does not recreate `app`; Task 8 step 3b confirms this on staging) | previous tag | "When `migrate` fails" below |
-| `health` | old app again (`rollback.sh` recreated it) | previous tag | read `$C logs --tail 100 app`, fix, release again |
+| `migrate` | old app, untouched (`migrate` ran as a one-off container; verified locally on the core profile with Nginx, 2026-10-01; Task 8 step 3b repeats it on the VPS) | previous tag | "When `migrate` fails" below |
+| `up` (recreating `app` failed) | old app again (`rollback.sh` recreated it) | previous tag | read `$C logs --tail 100 app`, fix, release again |
+| `health` | old app again (`rollback.sh` recreated it and reloaded Nginx). Nginx itself is not recreated before stage `services` | previous tag | read `$C logs --tail 100 app`, fix, release again |
+| `services` (Nginx or backup did not start) | the **new** app (healthy); Nginx or backup as the error says | previous tag | `$C ps -a`, `$C logs --tail 50 nginx`; then roll back or fix and deploy again, as for a smoke failure |
 | `smoke` | the **new** app (healthy in its container) | previous tag | below |
 
 **Smoke failure.** The container is healthy, so the fault is between Cloudflare and the app (Nginx, the origin
@@ -72,7 +81,7 @@ Staging is a second compose project (`-p staging`) on the same VPS, behind basic
 
 - **Deploy:** push to `main` with `[staging]` in the head commit message, or Actions → deploy → Run workflow on
   branch `main` with target `staging`. Either runs `deploy-remote.sh staging sha-<12 hex>` with `DEPLOY_REF=main`.
-  After the health wait the script reloads production Nginx, then runs the smoke test against the staging host with
+  After the health wait the script reloads production Nginx (as for every deploy), then runs the smoke test against the staging host with
   `SMOKE_BASIC_AUTH` from `/srv/saathi/.env.staging`. Its state files are `staging.previous-tag` and
   `staging.previous-ref`.
 - **Stop after UAT** (by hand; no workflow does this): `$S down`. While stopped, the staging host returns 502
@@ -92,7 +101,8 @@ under `infra/`.
 ```
 
 `saathi.previous-tag` holds the tag that ran before the last **successful** deploy. `rollback.sh` rewrites `IMAGE_TAG`
-in the env file, recreates only `app` (`up -d --no-deps app`; `migrate` does not run), and appends a `rollback` line to
+in the env file, recreates only `app` (`up -d --no-deps app`; `migrate` does not run), reloads production Nginx so
+it resolves the new container, and appends a `rollback` line to
 `deploys.log`. It does not touch the database, does not wait for health, does not post to Slack and does not change
 `previous-tag`, so running it twice goes to the same tag. Check afterwards:
 
@@ -114,20 +124,21 @@ failed one, and a rollback by hand:
 2026-10-05T10:13:40+05:30 smoke prod v0.2.0 https://cares.saathiventures.com/api/health/ready: ok
 2026-10-05T10:13:40+05:30 ok prod v0.2.0 (previous v0.1.0)
 2026-10-09T15:01:12+05:30 deploy prod -> v0.3.0 ref=v0.3.0 (a91c0d4); destructive check: migrations since 3f2a9c1...
-2026-10-09T15:01:30+05:30 failed prod v0.3.0 at up (exit 1); IMAGE_TAG restored to v0.2.0
+2026-10-09T15:01:30+05:30 failed prod v0.3.0 at migrate (exit 1); IMAGE_TAG restored to v0.2.0
 2026-10-10T09:20:44+05:30 rollback prod -> v0.1.0
 ```
 
 - `deploy`: target, image tag, `DEPLOY_REF`, the short commit, and which migrations the destructive check scanned.
 - `smoke`: `ok` or `failed`.
 - `ok`: the deploy is complete; `previous-tag` and `previous-ref` were updated.
-- `failed`: the stage (`checkout`, `pull`, `backup`, `up`, `health`, `smoke`), the exit code, and the tag put back.
+- `failed`: the stage (`guard`, `checkout`, `pull`, `backup`, `migrate`, `up`, `health`, `services`, `smoke`), the exit code, and the tag put back.
   The GitHub Actions log has the command output.
 - `rollback`: target and the tag rolled back to (from a person, or from `deploy-remote.sh` after a failed health wait).
 
 ## When `migrate` fails
 
-`up -d` stops at `migrate`, so `app` is not recreated and keeps serving the old image. The script exits non-zero, the
+`run --rm migrate` exits non-zero before `app` is touched, so the old container keeps serving the old image. The
+Slack alert says "migration failed; the running app is unchanged". The script exits non-zero, the
 env file is back on the previous tag, and `previous-ref` is unchanged, so the next deploy's destructive check (and its
 pre-deploy backup) still covers the failed release's migrations. Nothing needs undoing on the host.
 

@@ -69,7 +69,7 @@ Tests that assert log output use `src/test/capture-logger.ts`: `createCapturingL
 
 ## How to see this yourself
 
-Each of these was run on 2026-09-29 against the test database in `.env.test.local`; see the root README for that setup.
+Each of these was run against the test database in `.env.test.local` (see the root README for that setup): the first two on 2026-09-29; the job-failure case in the third and the readiness-timeout case in the fourth were added and run on 2026-10-01 (audit fix wave A), and the three `npx vitest run` commands were run again on 2026-10-01.
 
 - `npm run start` with `DATABASE_URL`, `MEDIA_ROOT` and `JOBS_ENABLED=true` in the shell, then `curl -s -i localhost:3000/api/health/ready` shows `HTTP/1.1 200 OK` and `{"ok":true,"checks":{"database":"ok","storage":"ok","jobs":"ok"}}`.
 - `curl -s -D - localhost:3000/api/health -o /dev/null | grep -ic x-request-id` prints `0`: the health routes bypass `withHandler`. Routes added from Phase 1 use it and return `x-request-id`.

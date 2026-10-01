@@ -3,17 +3,12 @@
 # The body is a function so bash parses all of it before `git checkout` can rewrite this file mid-run.
 set -euo pipefail
 
-# Reads one KEY=value line from the env file without sourcing it (same parsing as infra/checks/check.sh).
-env_get() { sed -n "s/^$1=//p" "$2" 2>/dev/null | tail -n1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"; }
+# env_get and slack_post, from the checkout this run started in (resolved next to this script, before any checkout).
+# shellcheck source=../infra/lib/host.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../infra/lib/host.sh"
 
 # usage: notify <env file> <text>. Posts to SLACK_WEBHOOK_URL from the env file; never fails the deploy.
-notify() {
-  local url
-  url=$(env_get SLACK_WEBHOOK_URL "$1" || true)
-  [ -n "$url" ] || return 0
-  curl -sS -m 10 -X POST -H 'Content-type: application/json' \
-    --data "$(jq -cn --arg t "$2 ($(hostname))" '{text:$t}')" "$url" >/dev/null || true
-}
+notify() { slack_post "$(env_get SLACK_WEBHOOK_URL "$1" || true)" "$2 ($(hostname))"; }
 
 # usage: smoke_once <url> [user:password]. The credentials go to curl on stdin (-K -), so they are not in argv.
 smoke_once() {
@@ -24,27 +19,37 @@ smoke_once() {
   fi
 }
 
+# Trailing slashes removed, so /srv/saathi/ and /srv/saathi compare equal.
+trim_slash() {
+  local p=$1
+  while [ "${#p}" -gt 1 ] && [ "${p%/}" != "$p" ]; do p=${p%/}; done
+  printf '%s' "$p"
+}
+
 # State for the EXIT trap. Globals, because the trap runs after main's locals are gone.
 D_PROJECT='' D_TAG='' D_ENVF='' D_PREV='' D_STAGE=start D_OK=no
 
-# On any exit before the deploy is confirmed (set -e on pull, backup or migrate; the health wait; the smoke test):
-# put the previous IMAGE_TAG back in the env file and log where it stopped. previous-tag and previous-ref are written
-# only on success, so after a failure they still describe the last good deploy.
+# On any exit before the deploy is confirmed: put the previous IMAGE_TAG back in the env file and log where it
+# stopped. previous-tag and previous-ref are written only on success, so after a failure they still describe the last
+# good deploy. One Slack alert per failure: the up, health and smoke paths post their own; every other stage posts here.
+# shellcheck disable=SC2317  # reached through the EXIT trap
 on_exit() {
   local rc=$?
   [ "$D_OK" = yes ] && return 0
   [ -n "$D_PROJECT" ] || return 0
-  local note=""
+  local note="" what
   if [ -n "$D_PREV" ]; then
     sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$D_PREV/" "$D_ENVF" || true
     note="; IMAGE_TAG restored to $D_PREV"
   fi
   echo "$(date -Is) failed $D_PROJECT $D_TAG at $D_STAGE (exit $rc)$note" >> /srv/saathi/deploys.log || true
-  # The health and smoke paths post their own alert; the set -e paths (checkout, pull, backup, migrate) post here.
   case "$D_STAGE" in
-    health | smoke) ;;
-    *) notify "$D_ENVF" "[ALERT] deploy: $D_TAG on $D_PROJECT failed at $D_STAGE (exit $rc)$note; the running app is unchanged" ;;
+    up | health | smoke) return 0 ;;
+    migrate) what="migration failed; the running app is unchanged" ;;
+    services) what="$D_TAG runs in app and is healthy, but starting the other services failed. Decide: scripts/rollback.sh $D_PROJECT $D_PREV, or fix and deploy again" ;;
+    *) what="the running app is unchanged" ;;
   esac
+  notify "$D_ENVF" "[ALERT] deploy: $D_TAG on $D_PROJECT failed at $D_STAGE (exit $rc)$note; $what"
 }
 trap on_exit EXIT
 
@@ -57,7 +62,21 @@ main() {
     staging) envf=/srv/saathi/.env.staging; files="-f $repo/infra/compose.yaml -f $repo/infra/compose.staging.yaml"; name=staging; host=staging.cares.saathiventures.com ;;
     *) echo "unknown project $project"; exit 1 ;;
   esac
-  D_PROJECT=$project D_TAG=$tag D_ENVF=$envf D_STAGE=checkout
+  D_PROJECT=$project D_TAG=$tag D_ENVF=$envf D_STAGE=guard
+
+  # Staging must never open production's pgdata or media (PLAN.md §15.4). Its overlay mounts STAGING_DATA_ROOT,
+  # which must be set and differ from /srv/saathi and from DATA_ROOT in either env file.
+  if [ "$project" = staging ]; then
+    local sroot
+    sroot=$(trim_slash "$(env_get STAGING_DATA_ROOT "$envf" || true)")
+    if [ -z "$sroot" ] || [ "$sroot" = /srv/saathi ] \
+      || [ "$sroot" = "$(trim_slash "$(env_get DATA_ROOT /srv/saathi/.env.prod || true)")" ] \
+      || [ "$sroot" = "$(trim_slash "$(env_get DATA_ROOT "$envf" || true)")" ]; then
+      echo "refusing to deploy staging: STAGING_DATA_ROOT in $envf is '$sroot'; it must be set and differ from DATA_ROOT and /srv/saathi (e.g. /srv/saathi-staging)"
+      exit 1
+    fi
+  fi
+  D_STAGE=checkout
 
   cd "$repo"
   git fetch -q origin --tags
@@ -87,11 +106,24 @@ main() {
   $compose pull -q app
   if [ -n "$destructive" ] && [ "$project" = prod ]; then
     D_STAGE=backup
-    docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T backup backup.sh
+    docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod --profile core exec -T backup backup.sh
   fi
-  # Compose runs migrate first and recreates app only if migrate exits 0; a migrate failure ends the script here.
+
+  # Explicit stages, not one `up -d`: Compose creates every container before it starts any, so a plain `up` removed
+  # the old app before migrate ran, and Nginx's depends_on app:service_healthy made `up` itself fail before the
+  # health wait below could roll back.
+  # 1. migrate as a one-off container (it starts only postgres). A failure here leaves the running app untouched.
+  D_STAGE=migrate
+  $compose run --rm migrate
+  # 2. app alone, without its dependencies.
   D_STAGE=up
-  $compose up -d --remove-orphans
+  if ! $compose up -d --no-deps app; then
+    echo "app could not be recreated; rolling back to $prev"
+    notify "$envf" "[ALERT] deploy: $tag on $project: recreating app failed; rolling back to $prev"
+    "$repo/scripts/rollback.sh" "$project" "$prev"
+    exit 1
+  fi
+  # 3. health wait; back to the previous tag if the new app does not become healthy.
   D_STAGE=health
   local healthy=no
   for _ in $(seq 1 30); do
@@ -105,12 +137,15 @@ main() {
     exit 1
   fi
   echo "healthy"
-  if [ "$project" = staging ]; then
-    # Nginx (in the prod project) resolves upstream names only at start; reload it to pick up the new staging app (plan 0B Task 3).
-    docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T nginx nginx -s reload || true
-  fi
+  # 4. everything else (Nginx and backup in production), now that app is healthy. migrate runs again and finds
+  #    nothing to apply.
+  D_STAGE=services
+  $compose up -d --remove-orphans
+  # Nginx (in the prod project for both targets) resolves upstream names only at start or reload, and a recreated app
+  # can get a new address: without the reload Nginx kept proxying to the old one (502, seen locally 2026-10-01).
+  docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod --profile core exec -T nginx nginx -s reload || true
 
-  # Smoke test through the edge (Cloudflare -> Nginx -> app). No automatic rollback here: the container is healthy,
+  # 5. smoke test through the edge (Cloudflare -> Nginx -> app). No automatic rollback here: the container is healthy,
   # so a failure points at Nginx, the certificate or DNS; the operator decides (docs/runbooks/deploy-and-rollback.md).
   # The new app keeps running, but the env file goes back to $prev (EXIT trap), so the deploy counts as not done.
   # Staging sits behind basic auth: SMOKE_BASIC_AUTH=user:password in .env.staging, passed on stdin, not argv.
