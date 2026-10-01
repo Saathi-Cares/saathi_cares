@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { siteContent } from '@/content/site';
+import { org, siteContent } from '@/content/site';
+import { pageMetadata } from '@/lib/page-metadata';
 
-export const metadata: Metadata = { title: 'Donate' };
+export const metadata: Metadata = pageMetadata({
+  title: 'Donate',
+  description: `How to support ${org.name}. Online donations are not available yet; contact us to give.`,
+  path: '/donate',
+});
 
 export default function DonatePage() {
   const { cta } = siteContent;
@@ -12,7 +17,7 @@ export default function DonatePage() {
       <h1 className="font-serif text-4xl mt-2">{cta.title}</h1>
       <p className="mt-4 text-muted-foreground">{cta.description}</p>
       <p className="mt-8 rounded-lg border p-4">
-        Online donations are not available yet. To support Saathi Cares, please{' '}
+        Online donations are not available yet. To support {org.name}, please{' '}
         <Link href="/contact" className="underline">
           contact us
         </Link>{' '}

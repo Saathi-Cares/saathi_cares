@@ -2,14 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CARES by Saathi Ventures - Premium Nonprofit Design System
-   Colors: Healing teal, warm earth tones, hopeful coral
-   Mood: Trustworthy, compassionate, grounded, professional
-*/
+/* Design tokens (HSL channels) and shared classes for the public pages; see tailwind.config.ts. */
 
 @layer base {
   :root {
-    /* Core brand - Healing teal green */
     --background: 45 30% 98%;
     --foreground: 200 25% 15%;
 
@@ -47,18 +43,13 @@
 
     /* Extended palette */
     --teal-50: 175 50% 96%;
-    --teal-100: 175 50% 90%;
-    --teal-500: 175 45% 35%;
     --teal-600: 175 45% 28%;
-    --teal-700: 175 45% 22%;
 
     --coral-50: 12 80% 97%;
     --coral-500: 12 70% 55%;
     --coral-600: 12 70% 48%;
 
-    --sand-50: 35 40% 97%;
     --sand-100: 35 35% 93%;
-    --sand-200: 35 30% 88%;
 
     /* Gradients */
     --gradient-hero: linear-gradient(
@@ -67,8 +58,6 @@
       hsl(175 45% 35%) 50%,
       hsl(180 40% 30%) 100%
     );
-    --gradient-warm: linear-gradient(180deg, hsl(45 30% 98%) 0%, hsl(35 30% 95%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(40 40% 99%) 0%, hsl(35 35% 97%) 100%);
 
     /* Shadows */
     --shadow-soft: 0 4px 20px -4px hsl(200 25% 15% / 0.08);
@@ -84,45 +73,6 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-
-  .dark {
-    --background: 200 25% 10%;
-    --foreground: 45 30% 95%;
-
-    --card: 200 25% 12%;
-    --card-foreground: 45 30% 95%;
-
-    --popover: 200 25% 12%;
-    --popover-foreground: 45 30% 95%;
-
-    --primary: 175 45% 45%;
-    --primary-foreground: 200 25% 10%;
-
-    --secondary: 200 20% 20%;
-    --secondary-foreground: 45 30% 95%;
-
-    --muted: 200 20% 18%;
-    --muted-foreground: 200 15% 60%;
-
-    --accent: 12 70% 55%;
-    --accent-foreground: 45 30% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 200 20% 20%;
-    --input: 200 20% 20%;
-    --ring: 175 45% 45%;
-
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
 }
 
 @layer base {
@@ -130,8 +80,10 @@
     @apply border-border;
   }
 
-  html {
-    scroll-behavior: smooth;
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   body {
@@ -163,16 +115,8 @@
     @apply max-w-7xl mx-auto;
   }
 
-  .text-balance {
-    text-wrap: balance;
-  }
-
   .gradient-hero {
     background: var(--gradient-hero);
-  }
-
-  .gradient-warm {
-    background: var(--gradient-warm);
   }
 
   .shadow-soft {
@@ -189,20 +133,12 @@
 }
 
 @layer utilities {
-  /* Entrance animation for public-page content: CSS only, no scroll-triggered JavaScript.
-     Stagger with an inline animation-delay. Users who prefer reduced motion get static content. */
+  /* Entrance animation for public-page content. It runs once on page load (CSS only, not on scroll);
+     stagger with an animation-delay (the <Enter delay> component). Users who prefer reduced motion get static content. */
   @media (prefers-reduced-motion: no-preference) {
-    .reveal {
+    .enter {
       animation: fadeUp 0.6s ease-out both;
     }
-  }
-
-  .animate-fade-up {
-    animation: fadeUp 0.6s ease-out forwards;
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-out forwards;
   }
 
   @keyframes fadeUp {
@@ -213,15 +149,6 @@
     to {
       opacity: 1;
       transform: translateY(0);
-    }
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
     }
   }
 }

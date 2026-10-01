@@ -1,8 +1,8 @@
-import { BookOpen, GraduationCap, Heart, Sparkles, Stethoscope, Users, type LucideIcon } from 'lucide-react';
 import type { ProgramsContent } from '@/content/site';
+import { Enter } from './Enter';
+import { programIcons } from './icons';
 
-const iconMap: Record<string, LucideIcon> = { Stethoscope, BookOpen, Users, Sparkles, Heart, GraduationCap };
-const colorCycle = ['teal', 'coral', 'sand', 'teal'] as const;
+const colorCycle = ['teal', 'coral', 'sand'] as const;
 const colorStyles = {
   teal: { bg: 'bg-teal-50', iconBg: 'bg-primary', iconColor: 'text-primary-foreground' },
   coral: { bg: 'bg-coral-50', iconBg: 'bg-accent', iconColor: 'text-accent-foreground' },
@@ -11,26 +11,26 @@ const colorStyles = {
 
 export function Programs({ content }: { content: ProgramsContent }) {
   return (
-    <section id="programs" className="section-padding bg-secondary">
+    <section id="programs" className="section-padding scroll-mt-20 bg-secondary">
       <div className="container-wide mx-auto">
-        <div className="reveal text-center mb-16">
+        <Enter className="text-center mb-16">
           <span className="text-sm font-medium text-primary uppercase tracking-wider">{content.badge}</span>
           <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl text-foreground mt-3 mb-6">
             {content.title}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{content.description}</p>
-        </div>
+        </Enter>
 
         <div className="grid md:grid-cols-2 gap-8">
           {content.programs.map((program, index) => {
             const color = colorCycle[index % colorCycle.length] ?? 'teal';
             const styles = colorStyles[color];
-            const Icon = iconMap[program.icon] ?? Heart;
+            const Icon = programIcons[program.icon];
             return (
-              <div
+              <Enter
                 key={program.id}
-                className={`reveal ${styles.bg} rounded-xl p-8 group hover:shadow-elevated transition-all duration-300`}
-                style={{ animationDelay: `${index * 100}ms` }}
+                delay={index * 100}
+                className={`${styles.bg} rounded-xl p-8 group hover:shadow-elevated transition-all duration-300`}
               >
                 <div className="flex items-start gap-5">
                   <div
@@ -53,7 +53,7 @@ export function Programs({ content }: { content: ProgramsContent }) {
                     )}
                   </div>
                 </div>
-              </div>
+              </Enter>
             );
           })}
         </div>

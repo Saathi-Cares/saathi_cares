@@ -12,15 +12,9 @@ test('home page renders the hero and sections', async ({ page }) => {
 for (const width of [undefined, 360] as const) {
   test(`home page has no horizontal overflow${width ? ` at ${width}px` : ''}`, async ({ page }) => {
     if (width) await page.setViewportSize({ width, height: 800 });
+    // The entrance animations translate content; with reduced motion they are off, so the layout is final at load.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    // Scroll through the page so every in-view animation settles into its final position.
-    await page.evaluate(async () => {
-      for (let y = 0; y < document.body.scrollHeight; y += window.innerHeight / 2) {
-        window.scrollTo(0, y);
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-    });
-    await page.waitForTimeout(800);
     // Compare with the configured viewport, not window.innerWidth: under mobile emulation an overflowing
     // page widens the layout viewport, so innerWidth grows with the overflow and the check would be vacuous.
     const viewportWidth = page.viewportSize()?.width ?? 0;
@@ -33,5 +27,6 @@ for (const width of [undefined, 360] as const) {
 test('404 page is served for unknown routes', async ({ page }) => {
   const res = await page.goto('/nope');
   expect(res?.status()).toBe(404);
-  await expect(page.getByText('Page not found')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
 });

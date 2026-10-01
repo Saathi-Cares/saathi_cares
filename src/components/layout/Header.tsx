@@ -1,33 +1,40 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Heart, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { navLinks, org } from '@/content/site';
 import { cn } from '@/lib/utils';
 
-// Section links point at anchors on the home page; `/contact` and `/donate` are routes.
 // Staff portal links are added when those routes exist (PLAN.md Phase 0 only ships public pages).
-const navLinks = [
-  { name: 'Home', href: '/#home' },
-  { name: 'About', href: '/#about' },
-  { name: 'Our Work', href: '/#programs' },
-  { name: 'Impact', href: '/#impact' },
-  { name: 'Team', href: '/#team' },
-  { name: 'Contact', href: '/contact' },
-];
+
+function subscribeToScroll(onChange: () => void) {
+  window.addEventListener('scroll', onChange, { passive: true });
+  return () => window.removeEventListener('scroll', onChange);
+}
+
+// Read on mount as well as on scroll, so a page restored mid-scroll gets the solid header at once.
+const isScrolledNow = () => window.scrollY > 20;
+const isScrolledOnServer = () => false;
 
 export function Header() {
-  const [isScrolled, setIsScrolled] = useState(false);
+  const isScrolled = useSyncExternalStore(subscribeToScroll, isScrolledNow, isScrolledOnServer);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    if (!isMobileMenuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setIsMobileMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [isMobileMenuOpen]);
 
   const isActive = (href: string) => !href.startsWith('/#') && pathname === href;
 
@@ -42,8 +49,8 @@ export function Header() {
               <Heart className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <span className="font-serif font-semibold text-xl text-foreground">Saathi Cares</span>
-              <p className="text-xs text-muted-foreground -mt-0.5">Oral Health for All</p>
+              <span className="font-serif font-semibold text-xl text-foreground">{org.name}</span>
+              <p className="text-xs text-muted-foreground -mt-0.5">{org.tagline}</p>
             </div>
           </Link>
 
@@ -74,10 +81,11 @@ export function Header() {
           </div>
 
           <button
+            ref={menuButtonRef}
             type="button"
             className="lg:hidden p-2 -mr-2"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
+            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMobileMenuOpen}
             aria-controls="mobile-menu"
           >
@@ -91,7 +99,7 @@ export function Header() {
       </div>
 
       {isMobileMenuOpen && (
-        <div id="mobile-menu" className="reveal lg:hidden bg-background border-t border-border">
+        <div id="mobile-menu" className="enter lg:hidden bg-background border-t border-border">
           <div className="px-6 py-6 space-y-4">
             {navLinks.map((link) => (
               <Link

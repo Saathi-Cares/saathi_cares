@@ -1,29 +1,27 @@
 import type { Metadata } from 'next';
 import { Inter, Lora } from 'next/font/google';
+import { org } from '@/content/site';
 import './globals.css';
 
+// Weights and styles actually used: Inter 400/500 for body text, Lora 600/700 for headings and figures.
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500'],
   variable: '--font-inter',
   display: 'swap',
 });
 const lora = Lora({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  style: ['normal', 'italic'],
+  weight: ['600', '700'],
   variable: '--font-lora',
   display: 'swap',
 });
 
-const siteUrl = 'https://cares.saathiventures.com';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: { default: 'Saathi Cares | Taking Oral Healthcare to the Last Mile', template: '%s | Saathi Cares' },
-  description:
-    'Saathi Cares by SHC Foundation provides free dental camps, school oral health programs, and community outreach to underserved communities across India. Join our mission for oral health equity.',
-  authors: [{ name: 'SHC Foundation (Saathi Ventures)' }],
+  metadataBase: new URL(org.url),
+  title: { default: `${org.name} | ${org.headline}`, template: `%s | ${org.name}` },
+  description: org.metaDescription,
+  authors: [{ name: `${org.legalName} (${org.parent})` }],
   keywords: [
     'oral health',
     'dental care',
@@ -36,15 +34,13 @@ export const metadata: Metadata = {
     'dental camps',
     'free dental checkup',
   ],
-  alternates: { canonical: siteUrl },
+  // `./` resolves against metadataBase per route, so each page is its own canonical URL.
+  alternates: { canonical: './' },
+  // No title or description here: each page sets its own `openGraph` (src/lib/page-metadata.ts).
   openGraph: {
     type: 'website',
-    url: siteUrl,
-    siteName: 'Saathi Cares',
+    siteName: org.name,
     locale: 'en_IN',
-    title: 'Saathi Cares | Taking Oral Healthcare to the Last Mile',
-    description:
-      'Free dental camps, school programs, and community outreach for underserved communities across India.',
     images: [{ url: '/og-image.jpg' }],
   },
   twitter: { card: 'summary_large_image', images: ['/og-image.jpg'] },
@@ -54,19 +50,19 @@ export const metadata: Metadata = {
 const organisationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'NGO',
-  name: 'Saathi Cares',
-  alternateName: 'SHC Foundation',
-  url: siteUrl,
-  description:
-    'Taking oral healthcare to the last mile: free dental camps and programs for underserved communities across India.',
+  name: org.name,
+  alternateName: org.legalName,
+  url: org.url,
+  email: org.email,
+  description: org.structuredDescription,
   address: {
     '@type': 'PostalAddress',
-    addressLocality: 'Gurugram',
-    addressRegion: 'Haryana',
-    postalCode: '122001',
-    addressCountry: 'IN',
+    addressLocality: org.address.locality,
+    addressRegion: org.address.region,
+    postalCode: org.address.postalCode,
+    addressCountry: org.address.countryCode,
   },
-  sameAs: ['https://www.linkedin.com/company/saathiventures', 'https://twitter.com/saathiventures'],
+  sameAs: org.socials.map((social) => social.href),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

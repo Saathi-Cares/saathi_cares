@@ -58,7 +58,7 @@ docs/           API and internal changelogs, ADR index, council reviews, phase p
 
 ## What exists today (Phase 0A)
 
-- Public pages `/`, `/contact` and `/donate`, prerendered at build time from `src/content/site.ts`. The home page sections are server components with CSS-only entrance animations (no framer-motion): the Hero uses `tailwindcss-animate` classes, the other sections the `.reveal` class in `app/globals.css`; both are off for users who prefer reduced motion. Of the page components, only the Header is a client component (scroll state and the mobile menu). It links only to routes that exist: no portal or login links. The contact page lists contact details and has no form. The donate page says online donations are not available yet.
+- Public pages `/`, `/contact` and `/donate`, prerendered at build time from `src/content/site.ts`. The home page sections are server components with CSS-only entrance animations (no framer-motion): the Hero uses `tailwindcss-animate` classes, the other sections the `.enter` class in `app/globals.css` through the `<Enter delay>` component; both run once on page load and are off for users who prefer reduced motion. All public copy, the contact details, the navigation links and the JSON-LD come from `src/content/site.ts`. Of the page components, only the Header is a client component (scroll state and the mobile menu). It links only to routes that exist: no portal or login links. The contact page lists the email address, office address and working hours, and has no form; no phone number is published. The donate page says online donations are not available yet. Unknown URLs get a 404 page inside the site header and footer.
 - `GET /api/health` returns `{ "status": "alive" }`. `GET /api/health/ready` returns `{ ok, checks: { database, storage, jobs } }` with 200 when every check is `ok`, otherwise 503.
 - Server foundation in `src/server/`: config validation, JSON logs with redaction, the error taxonomy, the `withHandler` route wrapper, the SQL migration runner, local file storage, and an in-process pg-boss consumer with one test-only job. `withHandler` is exercised by its unit tests; no route uses it yet.
 
@@ -67,6 +67,8 @@ docs/           API and internal changelogs, ADR index, council reviews, phase p
 - No admin, no login, no forms.
 - Mobile Lighthouse performance measured 84–87 on a bare `next start`. The ≥ 90 target is re-measured behind Nginx and Cloudflare at Phase 0 exit.
 - The coral Donate button's text contrast is 3.57:1, below 4.5:1. The brand decision is pending.
+- Contact details (email, address, team LinkedIn URLs) carried over from the prototype; pending confirmation by the organisation.
+- The population and prevalence statistics in the home page's "What Are We Solving?" section have no cited source yet; they stay until the owner supplies the sources.
 - `dist/migrate.js` needs `MIGRATIONS_DIR` until plan 0B copies the SQL files next to it.
 
 ## Dormant components

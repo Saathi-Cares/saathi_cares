@@ -13,7 +13,10 @@ const enter = `${slideIn} fade-in`;
 
 export function Hero({ content }: { content: HeroContent }) {
   return (
-    <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section
+      id="home"
+      className="scroll-mt-20 relative min-h-screen flex items-center justify-center overflow-hidden"
+    >
       {/* `absolute` is a positioned container, which is what next/image `fill` requires. */}
       <div className="absolute inset-0">
         <Image

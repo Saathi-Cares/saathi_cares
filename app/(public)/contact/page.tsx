@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
-import { siteContent } from '@/content/site';
+import { org, siteContent } from '@/content/site';
+import { pageMetadata } from '@/lib/page-metadata';
 
-export const metadata: Metadata = { title: 'Contact' };
+export const metadata: Metadata = pageMetadata({
+  title: 'Contact',
+  description: `How to reach ${org.name}: email, office address and the states where we work.`,
+  path: '/contact',
+});
 
 export default function ContactPage() {
   const { contact } = siteContent;
@@ -11,6 +16,26 @@ export default function ContactPage() {
       <h1 className="font-serif text-4xl mt-2">{contact.title}</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">{contact.description}</p>
       <dl className="mt-12 grid gap-8 sm:grid-cols-2">
+        <div>
+          <dt className="font-medium">Office Address</dt>
+          <dd className="text-muted-foreground">
+            <address className="not-italic">
+              {org.address.lines.map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
+            </address>
+          </dd>
+        </div>
+        <div>
+          <dt className="font-medium">Email</dt>
+          <dd>
+            <a href={`mailto:${org.email}`} className="text-primary underline break-all">
+              {org.email}
+            </a>
+          </dd>
+        </div>
         {contact.contactInfo.map((item) => (
           <div key={item.title}>
             <dt className="font-medium">{item.title}</dt>

@@ -1,13 +1,14 @@
 import { Heart, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import type { CTAContent } from '@/content/site';
+import { org, type CTAContent } from '@/content/site';
+import { Enter } from './Enter';
 
 export function CTA({ content }: { content: CTAContent }) {
   return (
     <section className="section-padding bg-secondary">
       <div className="container-narrow mx-auto">
-        <div className="reveal bg-card rounded-2xl p-8 md:p-12 lg:p-16 shadow-elevated text-center">
+        <Enter className="bg-card rounded-2xl p-8 md:p-12 lg:p-16 shadow-elevated text-center">
           <div className="w-16 h-16 rounded-full bg-coral-50 flex items-center justify-center mx-auto mb-6">
             <Heart className="w-8 h-8 text-accent" />
           </div>
@@ -41,15 +42,12 @@ export function CTA({ content }: { content: CTAContent }) {
           <div className="mt-8 pt-8 border-t border-border">
             <p className="text-sm text-muted-foreground">
               Have questions? Reach out at{' '}
-              <a
-                href="mailto:cares@saathiventures.com"
-                className="text-primary font-medium hover:underline break-all"
-              >
-                cares@saathiventures.com
+              <a href={`mailto:${org.email}`} className="text-primary font-medium hover:underline break-all">
+                {org.email}
               </a>
             </p>
           </div>
-        </div>
+        </Enter>
       </div>
     </section>
   );
