@@ -62,7 +62,7 @@ $C exec backup restore-test.sh           # restore the newest dump into a scratc
 ### A1. The release is bad, the data is fine
 
 ```bash
-/srv/saathi/repo/scripts/rollback.sh prod            # back to the tag recorded before the last deploy
+/srv/saathi/repo/scripts/rollback.sh prod            # back to the tag recorded before the last successful deploy
 /srv/saathi/repo/scripts/rollback.sh prod v0.1.0     # or to a named tag
 ```
 

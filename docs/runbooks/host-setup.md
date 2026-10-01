@@ -318,9 +318,10 @@ In the Cloudflare dashboard for `saathiventures.com`:
   (`locks/`), and `scripts/mirror-backup.ps1` does not pass `--no-lock`.
 
 - [ ] On the developer's Windows machine, set up the daily mirror (`scripts/mirror-backup.ps1`). The script takes
-  two parameters, `-VpsHost` (default `deploy@cares.saathiventures.com`) and `-Local` (default
-  `%USERPROFILE%\saathi-backups\restic`), and reads the passphrase only from `$env:RESTIC_PASSWORD`. The default host
-  is proxied by Cloudflare and will not answer SSH, so always pass `-VpsHost deploy@<VPS_IP>` (or the DNS-only name).
+  two parameters, `-VpsHost` (required, no default) and `-Local` (default `%USERPROFILE%\saathi-backups\restic`), and
+  reads the passphrase only from `$env:RESTIC_PASSWORD`. `-VpsHost` is `deploy@<VPS_IP>` or `deploy@` the DNS-only
+  name from step 5, never `cares.saathiventures.com`: that name is proxied by Cloudflare, which does not carry SSH.
+  (`scripts/mirror-backup.sh`, for a Linux or macOS machine, takes the same host as its required first argument.)
 
   1. Install restic: `winget install restic.restic`. Check `ssh deploy@<VPS_IP>` works without a prompt (an SSH key
      without a passphrase, or the `ssh-agent` service), which also records the host key in `known_hosts`.

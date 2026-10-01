@@ -1,7 +1,9 @@
 # Mirrors the VPS restic repository to this machine. Run from Task Scheduler daily (see docs/runbooks/host-setup.md).
 # Requires: restic (winget install restic.restic), an SSH key that can read /srv/saathi/backups on the VPS.
+# -VpsHost is required: deploy@<VPS IP> or deploy@<DNS-only name>. Not cares.saathiventures.com: that name goes through
+# Cloudflare's proxy, which does not carry SSH.
 param(
-  [string]$VpsHost = "deploy@cares.saathiventures.com",
+  [Parameter(Mandatory)][string]$VpsHost,
   [string]$Local = "$env:USERPROFILE\saathi-backups\restic"
 )
 $ErrorActionPreference = "Stop"

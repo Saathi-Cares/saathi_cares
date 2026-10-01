@@ -24,6 +24,30 @@ smoke_once() {
   fi
 }
 
+# State for the EXIT trap. Globals, because the trap runs after main's locals are gone.
+D_PROJECT='' D_TAG='' D_ENVF='' D_PREV='' D_STAGE=start D_OK=no
+
+# On any exit before the deploy is confirmed (set -e on pull, backup or migrate; the health wait; the smoke test):
+# put the previous IMAGE_TAG back in the env file and log where it stopped. previous-tag and previous-ref are written
+# only on success, so after a failure they still describe the last good deploy.
+on_exit() {
+  local rc=$?
+  [ "$D_OK" = yes ] && return 0
+  [ -n "$D_PROJECT" ] || return 0
+  local note=""
+  if [ -n "$D_PREV" ]; then
+    sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$D_PREV/" "$D_ENVF" || true
+    note="; IMAGE_TAG restored to $D_PREV"
+  fi
+  echo "$(date -Is) failed $D_PROJECT $D_TAG at $D_STAGE (exit $rc)$note" >> /srv/saathi/deploys.log || true
+  # The health and smoke paths post their own alert; the set -e paths (checkout, pull, backup, migrate) post here.
+  case "$D_STAGE" in
+    health | smoke) ;;
+    *) notify "$D_ENVF" "[ALERT] deploy: $D_TAG on $D_PROJECT failed at $D_STAGE (exit $rc)$note; the running app is unchanged" ;;
+  esac
+}
+trap on_exit EXIT
+
 main() {
   local project=$1 tag=$2
   local ref=${DEPLOY_REF:-main}
@@ -33,6 +57,7 @@ main() {
     staging) envf=/srv/saathi/.env.staging; files="-f $repo/infra/compose.yaml -f $repo/infra/compose.staging.yaml"; name=staging; host=staging.cares.saathiventures.com ;;
     *) echo "unknown project $project"; exit 1 ;;
   esac
+  D_PROJECT=$project D_TAG=$tag D_ENVF=$envf D_STAGE=checkout
 
   cd "$repo"
   git fetch -q origin --tags
@@ -40,7 +65,7 @@ main() {
   # Only a branch moves; a tag is already exact and `pull` on a detached HEAD would fail.
   if git show-ref --verify --quiet "refs/remotes/origin/$ref"; then git pull -q --ff-only; fi
 
-  # Migrations new since the last deployed commit decide whether a pre-deploy backup is needed.
+  # Migrations new since the last successfully deployed commit decide whether a pre-deploy backup is needed.
   local ref_file="/srv/saathi/$name.previous-ref" prev_ref destructive scope
   prev_ref=$(cat "$ref_file" 2>/dev/null || true)
   if [ -n "$prev_ref" ] && git cat-file -e "$prev_ref^{commit}" 2>/dev/null; then
@@ -54,25 +79,29 @@ main() {
 
   local prev
   prev=$(grep -oP '^IMAGE_TAG=\K.*' "$envf" || echo latest)
-  echo "$prev" > "/srv/saathi/$name.previous-tag"
-  git rev-parse HEAD > "$ref_file"
+  D_PREV=$prev
   sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$tag/" "$envf"
 
   local compose="docker compose -p $name $files --env-file $envf --profile core"
+  D_STAGE=pull
   $compose pull -q app
   if [ -n "$destructive" ] && [ "$project" = prod ]; then
+    D_STAGE=backup
     docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T backup backup.sh
   fi
+  # Compose runs migrate first and recreates app only if migrate exits 0; a migrate failure ends the script here.
+  D_STAGE=up
   $compose up -d --remove-orphans
+  D_STAGE=health
   local healthy=no
   for _ in $(seq 1 30); do
     if $compose ps --format json app | jq -e '.Health == "healthy"' >/dev/null 2>&1; then healthy=yes; break; fi
     sleep 5
   done
   if [ "$healthy" != yes ]; then
-    echo "app did not become healthy; rolling back"
+    echo "app did not become healthy; rolling back to $prev"
     notify "$envf" "[ALERT] deploy: $tag on $project did not become healthy; rolling back to $prev"
-    "$repo/scripts/rollback.sh" "$project"
+    "$repo/scripts/rollback.sh" "$project" "$prev"
     exit 1
   fi
   echo "healthy"
@@ -83,7 +112,9 @@ main() {
 
   # Smoke test through the edge (Cloudflare -> Nginx -> app). No automatic rollback here: the container is healthy,
   # so a failure points at Nginx, the certificate or DNS; the operator decides (docs/runbooks/deploy-and-rollback.md).
+  # The new app keeps running, but the env file goes back to $prev (EXIT trap), so the deploy counts as not done.
   # Staging sits behind basic auth: SMOKE_BASIC_AUTH=user:password in .env.staging, passed on stdin, not argv.
+  D_STAGE=smoke
   local url="https://$host/api/health/ready" auth smoke=failed
   auth=$(env_get SMOKE_BASIC_AUTH "$envf" || true)
   for _ in $(seq 1 12); do
@@ -93,10 +124,16 @@ main() {
   echo
   echo "$(date -Is) smoke $project $tag $url: $smoke" >> /srv/saathi/deploys.log
   if [ "$smoke" != ok ]; then
-    echo "smoke test failed: $url; the new app is running; decide whether to run scripts/rollback.sh $project"
-    notify "$envf" "[ALERT] deploy: $tag on $project is healthy in the container but $url failed 12 times; not rolled back. Decide: scripts/rollback.sh $project"
+    echo "smoke test failed: $url; $tag is still running; decide: scripts/rollback.sh $project $prev, or fix the edge and deploy again"
+    notify "$envf" "[ALERT] deploy: $tag on $project is healthy in the container but $url failed 12 times; $tag still runs, env file reset to $prev. Decide: scripts/rollback.sh $project $prev, or fix the edge and redeploy"
     exit 1
   fi
+
+  # Success: only now record what rollback.sh and the next destructive check read.
+  echo "$prev" > "/srv/saathi/$name.previous-tag"
+  git rev-parse HEAD > "$ref_file"
+  D_OK=yes
+  echo "$(date -Is) ok $project $tag (previous $prev)" >> /srv/saathi/deploys.log
   notify "$envf" "deployed $tag to $project"
   exit 0
 }
