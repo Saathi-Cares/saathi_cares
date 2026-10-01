@@ -35,7 +35,16 @@ Thresholds are those of PLAN.md §14.4. Window "5 min" and "10 min" read `docker
 | `login_burst` | `login failed` events grouped by `ip` in the last 10 min | above 50 from one IP |
 | `cert` | expiry of `/srv/saathi/certs/origin.pem` (the uptime monitor sees only Cloudflare's edge certificate) | under 14 days, or unreadable |
 
-Not raised by `check.sh`: site down and certificate expiry at the edge (hosted uptime monitor), table bloat (monthly report), webhook signature failures and patient-search rate-limit trips (no log event exists yet; added with the code that emits them in Phases 1 and 7).
+Where the Phase 0B brief differed, §14.4 was followed: disk and connections fail **above** 80 % (the brief failed at 80 %); the login-failure window is 10 min (the brief had 5); `db_up` (`SELECT 1`) and `job_queue` (depth > 500) were added because §14.4 lists them and the brief did not.
+
+Raised elsewhere: site down and edge-certificate expiry (hosted uptime monitor); table bloat (`monthly-report.sh`, tables over 20 % dead rows).
+
+**Waits on Phase 1/7** (in §14.4, not implemented yet, because the app does not emit the log events they would read):
+
+- Login-failure burst: the check exists and reads 0 until Phase 1 emits `login failed` (below).
+- Webhook signature failures: waits on Phase 7 (donations/payments webhooks). That code must log an event and add the check here.
+- Patient-search rate-limit trips: waits on Phase 1. That code must log an event and add the check here.
+- An email alert channel alongside Slack (§14.2): not implemented; Slack only.
 
 ## Log events the app must emit
 
@@ -46,8 +55,8 @@ Not raised by `check.sh`: site down and certificate expiry at the edge (hosted u
 
 ## State, muting, digest
 
-- State lives in `/srv/saathi/checks/state/<state name>`, containing `ok` or `fail`. Delete a file to reset that check.
-- Silence a check for 24 hours: `touch /srv/saathi/checks/state/<state name>.mute`. A muted check records its state but posts nothing and does not hold back the heartbeat. The mute stops working 24 h after the file's last modification; `touch` it again to extend, delete it to end early.
+- State lives in `/srv/saathi/checks/state/<state name>`, containing `ok`, `fail` (alerted), or `muted` (failing, first seen while muted, not alerted yet). Delete a file to reset that check.
+- Silence a check for 24 hours: `touch /srv/saathi/checks/state/<state name>.mute`. A muted check posts nothing. A muted failing check does not hold back the heartbeat, so a mute does not page through the uptime monitor instead. The mute stops working 24 h after the file's last modification (`touch` it again to extend, delete it to end early); a check still failing then alerts on the next run.
 - `check.sh --digest` (cron, 08:00) runs the checks, then posts one `[DIGEST]` message with every check's current state and any active mutes. It shows the state now, not a history of the last 24 h.
 - Runs are serialised with `flock` on `/srv/saathi/checks/state.lock`, so the 08:00 digest run waits for the 5-minute run.
 - Output goes to `/srv/saathi/checks/check.log`: one `fail:` line per failing check and a `checks done, failures=N` line per run.
@@ -56,4 +65,5 @@ Not raised by `check.sh`: site down and certificate expiry at the edge (hosted u
 
 - `logq.sh errors [since] | request <id> | slow [since] | login-failures [since]` queries the app's logs (`since` defaults to `2h`; `request` searches 48 h).
 - `monthly-report.sh` (cron, 09:00 on the 1st) posts disk use, media and backup sizes, database size, largest tables, tables over 20 % dead rows, the `pg_stat_statements` top 10 by total time, failed jobs this month, the last passed restore test, and the Cloudflare IP-list reminder.
-- `check.test.sh` runs `check.sh` against a temp directory with fake `curl` and `docker`: `bash infra/checks/check.test.sh`. It needs `jq` and exits 77 (skip) without it.
+- `check.test.sh` runs `check.sh` against a temp directory with fake `curl` and `docker`: `bash infra/checks/check.test.sh`. It needs `jq` and exits 77 (skip) without it. On a machine without jq, run it in a throwaway container:
+  `docker run --rm -v "$PWD:/w" -w /w alpine:3.20 sh -c 'apk add --no-cache bash jq openssl coreutils util-linux-misc findutils grep >/dev/null && bash infra/checks/check.test.sh'`

@@ -38,11 +38,16 @@ report() { # check, ok(0/1), message — alert on state change only
   local check=$1 ok=$2 msg=$3 prev
   prev=$(cat "$STATE/$check" 2>/dev/null || echo ok)
   if [ "$ok" -ne 0 ]; then
-    echo "fail" > "$STATE/$check"
-    if is_muted "$check"; then echo "muted fail: $check: $msg"; return; fi
+    # A failure seen only while muted is stored as "muted", not "fail", so it still alerts once the mute expires.
+    if is_muted "$check"; then
+      [ "$prev" = fail ] || echo "muted" > "$STATE/$check"
+      echo "muted fail: $check: $msg"
+      return 0
+    fi
     failures=$((failures + 1))
     echo "fail: $check: $msg"
-    [ "$prev" = ok ] && notify ALERT "$check" "$msg"
+    [ "$prev" != fail ] && notify ALERT "$check" "$msg"
+    echo "fail" > "$STATE/$check"
   else
     echo "ok" > "$STATE/$check"
     [ "$prev" = fail ] && ! is_muted "$check" && notify RECOVERED "$check" "$msg"

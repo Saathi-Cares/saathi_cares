@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Exercises check.sh against a temp directory with fake `curl` and `docker` on PATH. Needs bash, GNU date, openssl, jq.
 # usage: bash infra/checks/check.test.sh
+# ok/bad always return 0, so A && ok || bad is a safe if-else (SC2015); $notavar is meant literally (SC2016).
+# shellcheck disable=SC2015,SC2016
 set -eu
 command -v jq >/dev/null 2>&1 || { echo "SKIP: jq is not installed (check.sh needs it; install it on the host)"; exit 77; }
 here=$(cd "$(dirname "$0")" && pwd)
@@ -68,7 +70,7 @@ echo $((now - 30000)) > "$tmp/data/backups/state/last-backup-ok"
 run
 has 'slack.test' && bad "muted check still alerted: $(cat "$tmp/curl.log")" || ok "mute suppresses the alert"
 has 'hb.test/ping' && ok "muted failure does not block heartbeat" || bad "muted failure blocked heartbeat"
-[ "$(cat "$tmp/state/backup_age")" = fail ] && ok "muted check still records fail" || bad "muted check state not fail"
+[ "$(cat "$tmp/state/backup_age")" = muted ] && ok "muted check records state muted" || bad "muted check state: $(cat "$tmp/state/backup_age")"
 touch -d '-25 hours' "$tmp/state/backup_age.mute"
 run
 has 'ALERT\] backup_age' && ok "expired mute no longer silences" || bad "expired mute still silenced the alert"
