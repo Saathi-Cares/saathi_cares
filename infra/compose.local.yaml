@@ -1,6 +1,6 @@
 # Local verification only: the production stack on a laptop, on ports that do not clash with other
 # projects. Production (infra/compose.yaml alone) keeps 80/443 and publishes no Postgres port.
-#   docker compose -f infra/compose.yaml -f infra/compose.local.yaml --env-file infra/.env.compose --profile core up -d
+#   docker compose -p saathi-local -f infra/compose.yaml -f infra/compose.local.yaml --env-file infra/.env.compose --profile core up -d
 services:
   nginx:
     ports: !override ['18080:80', '18443:443']

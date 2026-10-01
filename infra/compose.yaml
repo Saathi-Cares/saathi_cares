@@ -4,12 +4,14 @@
 # overlays infra/compose.dev.yaml with --profile dev (Postgres and Mailpit only).
 name: saathi
 
+x-logging: &logging
+  driver: json-file
+  options: { max-size: '50m', max-file: '10' }
+
 x-common: &common
   restart: unless-stopped
   security_opt: ['no-new-privileges:true']
-  logging:
-    driver: json-file
-    options: { max-size: '50m', max-file: '10' }
+  logging: *logging
 
 services:
   postgres:
@@ -17,9 +19,9 @@ services:
     image: postgres:16-alpine
     profiles: ['core', 'dev']
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      SAATHI_OWNER_PASSWORD: ${SAATHI_OWNER_PASSWORD}
-      SAATHI_APP_PASSWORD: ${SAATHI_APP_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      SAATHI_OWNER_PASSWORD: ${SAATHI_OWNER_PASSWORD:?set in .env}
+      SAATHI_APP_PASSWORD: ${SAATHI_APP_PASSWORD:?set in .env}
     command: ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf']
     volumes:
       - ${DATA_ROOT:-/srv/saathi}/pgdata:/var/lib/postgresql/data
@@ -40,9 +42,10 @@ services:
     profiles: ['core']
     restart: 'no'
     security_opt: ['no-new-privileges:true']
+    logging: *logging
     command: ['node', 'dist/migrate.js']
     environment:
-      DATABASE_URL_MIGRATIONS: postgres://saathi_owner:${SAATHI_OWNER_PASSWORD}@postgres:5432/saathi
+      DATABASE_URL_MIGRATIONS: postgres://saathi_owner:${SAATHI_OWNER_PASSWORD:?set in .env}@postgres:5432/saathi
     depends_on:
       postgres: { condition: service_healthy }
     mem_limit: 256m
@@ -55,7 +58,7 @@ services:
     # The app reads only these variables (src/server/config.ts).
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://saathi_app:${SAATHI_APP_PASSWORD}@postgres:5432/saathi
+      DATABASE_URL: postgres://saathi_app:${SAATHI_APP_PASSWORD:?set in .env}@postgres:5432/saathi
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MEDIA_ROOT: /data/media
       JOBS_ENABLED: 'true'
@@ -107,7 +110,7 @@ services:
     environment:
       PGHOST: postgres
       PGUSER: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       PGDATABASE: saathi
       RESTIC_REPOSITORY: /backups/restic
       RESTIC_PASSWORD: ${RESTIC_PASSWORD}

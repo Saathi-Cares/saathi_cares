@@ -14,6 +14,8 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 4. `npm run migrate` applies the migrations (it reads `.env`).
 5. `npm run dev` (Next.js loads `.env` itself) and open http://localhost:8081.
 
+A local run of the production `core` stack (`infra/compose.local.yaml`) takes `-p saathi-local`, so it does not share the project name `saathi` with the dev profile above.
+
 ## Commands
 
 | Command | What it does |
