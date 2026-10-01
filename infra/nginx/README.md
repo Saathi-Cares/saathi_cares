@@ -20,11 +20,22 @@ Nginx (`nginx:1.27-alpine`, service `nginx` in `infra/compose.yaml`) terminates 
 any client-supplied `X-Request-Id`: a caller cannot choose the id the app logs. The same value is in the access log's
 `request_id` field, which joins an Nginx line to the app's log lines for that request.
 
-**One owner per header.** Nginx sends `Strict-Transport-Security` and `X-Content-Type-Options`, because it terminates TLS
-and serves `/media/public/` itself. `next.config.ts` sends `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`
-(`camera=(), geolocation=(), microphone=()` until Phase 2). A header set in both places reaches the browser twice, so
-never add one to the other side. `/_next/static/` hides Next's `Cache-Control` and sends a single
-`Cache-Control: public, immutable, max-age=31536000`.
+**One owner per header.** A header set in both places reaches the browser twice, so never add one to the other side.
+
+| Header                                         | Owner                         | Notes                                                                                                                     |
+| ---------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `Strict-Transport-Security`                    | Nginx (`security-headers.conf`) | Nginx terminates TLS and serves `/media/public/` itself.                                                                  |
+| `X-Content-Type-Options`                       | Nginx (`security-headers.conf`) | As above.                                                                                                                 |
+| `X-Frame-Options`, `Referrer-Policy`           | App (`next.config.ts`)        |                                                                                                                           |
+| `Permissions-Policy`                           | App (`next.config.ts`)        | `camera=(), geolocation=(), microphone=()` until Phase 2.                                                                 |
+| `Cache-Control` on `/_next/static/`, `/media/public/` | Nginx                  | `/_next/static/` hides Next's own and sends a single `public, immutable, max-age=31536000`.                               |
+| `Content-Security-Policy`                      | Not implemented in Phase 0    | A Phase 4 exit criterion (PLAN.md §18, "CSP has no unsafe-inline for scripts").                                          |
+
+**HTTP redirect.** The port-80 redirect echoes `$host` into the `Location` header. That is acceptable only because
+Cloudflare is the sole path to the origin and forwards only the hostnames configured for the zone.
+
+**Dotfile denial.** `location ~ /\.(git|env)` is deliberately unanchored: it denies (403) any path that contains `/.git` or
+`/.env`, at any depth.
 
 **`add_header` inheritance.** A location that has any `add_header` of its own inherits none from the server block. Any
 location that adds a header (as `/media/public/` and `/_next/static/` do for `Cache-Control`) must also
@@ -60,6 +71,13 @@ Bash on Windows, run it with `PATH=/usr/bin:$PATH bash scripts/dev-cert.sh .loca
 
 `burst` requests are served at once on top of the steady rate; for `login` (5/minute, burst 5) the seventh request in a
 quick run is the first 429.
+
+**What a 429 looks like.** Stock Nginx answers a `limit_req` rejection with an HTML page and no `Retry-After`. The HTTPS
+server in `conf.d/app.conf` sends every 429 to `location @rate_limited` (`error_page 429 = @rate_limited;`), which
+returns `Retry-After: 60`, `Content-Type: application/json`, HSTS and nosniff, and the PLAN.md §9.4 error envelope that
+the app uses (`src/server/http/errors.ts`):
+`{"error":{"code":"RATE_LIMITED","message":"Too many requests","request_id":"<Nginx $request_id>"}}`. A new
+rate-limited location in that server gets this for free. `staging.conf` has no rate-limited locations.
 
 ## Staging returns 502 while it is stopped
 
