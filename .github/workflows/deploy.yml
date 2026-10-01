@@ -35,22 +35,29 @@ jobs:
     if: github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[staging]') || github.event.inputs.target == 'staging')
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      DEPLOY_REF: main
     steps:
       - uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_REF
           script: /srv/saathi/repo/scripts/deploy-remote.sh staging ${{ needs.build.outputs.tag }}
   production:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.target == 'production'
     runs-on: ubuntu-latest
     environment: production
+    # The tag's own compose files and scripts are deployed, not main's.
+    env:
+      DEPLOY_REF: ${{ github.ref_name }}
     steps:
       - uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_REF
           script: /srv/saathi/repo/scripts/deploy-remote.sh prod ${{ needs.build.outputs.tag }}
