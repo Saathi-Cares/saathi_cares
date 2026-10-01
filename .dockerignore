@@ -1,0 +1,16 @@
+node_modules
+.next
+dist
+.git
+.github
+docs
+e2e
+media
+.test-media
+*.md
+!README.md
+.env
+.env.*
+playwright-report
+test-results
+infra

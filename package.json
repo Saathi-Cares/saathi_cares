@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev --port 8081",
     "build": "next build",
+    "postbuild": "npm run build:migrate && node -e \"require('fs').cpSync('src/server/db/migrations','dist/migrations',{recursive:true})\"",
     "start": "next start --port 3000",
     "build:migrate": "esbuild src/server/db/migrate-cli.ts --bundle --platform=node --target=node24 --format=esm --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=dist/migrate.js --external:pg-native",
     "migrate": "tsx --env-file=.env src/server/db/migrate-cli.ts",

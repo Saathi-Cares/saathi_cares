@@ -32,7 +32,7 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 
 `npm run start` prints `"next start" does not work with "output: standalone" configuration`. It still serves the build, and the e2e tests use it. The production image (plan 0B) runs the standalone `server.js` with `node` instead.
 
-`dist/migrate.js` looks for SQL files in a `migrations/` directory next to itself (`import.meta.dirname`); `MIGRATIONS_DIR` overrides that. Nothing copies the SQL files into `dist/` yet (plan 0B adds that), so run it today as `MIGRATIONS_DIR=src/server/db/migrations node dist/migrate.js`.
+`dist/migrate.js` looks for SQL files in a `migrations/` directory next to itself (`import.meta.dirname`); `MIGRATIONS_DIR` overrides that. `npm run build` runs a `postbuild` step that bundles `dist/migrate.js` and copies the SQL files to `dist/migrations/`, so after a build `node dist/migrate.js` needs no `MIGRATIONS_DIR`; the variable remains an optional override.
 
 ## Test database
 
@@ -69,7 +69,6 @@ docs/           API and internal changelogs, ADR index, council reviews, phase p
 - The coral Donate button's text contrast is 3.57:1, below 4.5:1. The brand decision is pending.
 - Contact details (email, address, team LinkedIn URLs) carried over from the prototype; pending confirmation by the organisation.
 - The population and prevalence statistics in the home page's "What Are We Solving?" section have no cited source yet; they stay until the owner supplies the sources.
-- `dist/migrate.js` needs `MIGRATIONS_DIR` until plan 0B copies the SQL files next to it.
 
 ## Dormant components
 
