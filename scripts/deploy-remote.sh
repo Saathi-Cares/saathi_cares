@@ -3,13 +3,34 @@
 # The body is a function so bash parses all of it before `git checkout` can rewrite this file mid-run.
 set -euo pipefail
 
+# Reads one KEY=value line from the env file without sourcing it (same parsing as infra/checks/check.sh).
+env_get() { sed -n "s/^$1=//p" "$2" 2>/dev/null | tail -n1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"; }
+
+# usage: notify <env file> <text>. Posts to SLACK_WEBHOOK_URL from the env file; never fails the deploy.
+notify() {
+  local url
+  url=$(env_get SLACK_WEBHOOK_URL "$1" || true)
+  [ -n "$url" ] || return 0
+  curl -sS -m 10 -X POST -H 'Content-type: application/json' \
+    --data "$(jq -cn --arg t "$2 ($(hostname))" '{text:$t}')" "$url" >/dev/null || true
+}
+
+# usage: smoke_once <url> [user:password]. The credentials go to curl on stdin (-K -), so they are not in argv.
+smoke_once() {
+  if [ -n "${2:-}" ]; then
+    printf 'user = "%s"\n' "$2" | curl -fsS --max-time 10 -K - "$1"
+  else
+    curl -fsS --max-time 10 "$1"
+  fi
+}
+
 main() {
   local project=$1 tag=$2
   local ref=${DEPLOY_REF:-main}
-  local repo=/srv/saathi/repo envf files name
+  local repo=/srv/saathi/repo envf files name host
   case "$project" in
-    prod)    envf=/srv/saathi/.env.prod;    files="-f $repo/infra/compose.yaml"; name=saathi ;;
-    staging) envf=/srv/saathi/.env.staging; files="-f $repo/infra/compose.yaml -f $repo/infra/compose.staging.yaml"; name=staging ;;
+    prod)    envf=/srv/saathi/.env.prod;    files="-f $repo/infra/compose.yaml"; name=saathi; host=cares.saathiventures.com ;;
+    staging) envf=/srv/saathi/.env.staging; files="-f $repo/infra/compose.yaml -f $repo/infra/compose.staging.yaml"; name=staging; host=staging.cares.saathiventures.com ;;
     *) echo "unknown project $project"; exit 1 ;;
   esac
 
@@ -43,20 +64,41 @@ main() {
     docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T backup backup.sh
   fi
   $compose up -d --remove-orphans
+  local healthy=no
   for _ in $(seq 1 30); do
-    if $compose ps --format json app | jq -e '.Health == "healthy"' >/dev/null 2>&1; then
-      echo "healthy"
-      if [ "$project" = staging ]; then
-        # Nginx (in the prod project) resolves upstream names only at start; reload it to pick up the new staging app (plan 0B Task 3).
-        docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T nginx nginx -s reload || true
-      fi
-      exit 0
-    fi
+    if $compose ps --format json app | jq -e '.Health == "healthy"' >/dev/null 2>&1; then healthy=yes; break; fi
     sleep 5
   done
-  echo "app did not become healthy; rolling back"
-  "$repo/scripts/rollback.sh" "$project"
-  exit 1
+  if [ "$healthy" != yes ]; then
+    echo "app did not become healthy; rolling back"
+    notify "$envf" "[ALERT] deploy: $tag on $project did not become healthy; rolling back to $prev"
+    "$repo/scripts/rollback.sh" "$project"
+    exit 1
+  fi
+  echo "healthy"
+  if [ "$project" = staging ]; then
+    # Nginx (in the prod project) resolves upstream names only at start; reload it to pick up the new staging app (plan 0B Task 3).
+    docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saathi/.env.prod exec -T nginx nginx -s reload || true
+  fi
+
+  # Smoke test through the edge (Cloudflare -> Nginx -> app). No automatic rollback here: the container is healthy,
+  # so a failure points at Nginx, the certificate or DNS; the operator decides (docs/runbooks/deploy-and-rollback.md).
+  # Staging sits behind basic auth: SMOKE_BASIC_AUTH=user:password in .env.staging, passed on stdin, not argv.
+  local url="https://$host/api/health/ready" auth smoke=failed
+  auth=$(env_get SMOKE_BASIC_AUTH "$envf" || true)
+  for _ in $(seq 1 12); do
+    if smoke_once "$url" "$auth"; then smoke=ok; break; fi
+    sleep 5
+  done
+  echo
+  echo "$(date -Is) smoke $project $tag $url: $smoke" >> /srv/saathi/deploys.log
+  if [ "$smoke" != ok ]; then
+    echo "smoke test failed: $url; the new app is running; decide whether to run scripts/rollback.sh $project"
+    notify "$envf" "[ALERT] deploy: $tag on $project is healthy in the container but $url failed 12 times; not rolled back. Decide: scripts/rollback.sh $project"
+    exit 1
+  fi
+  notify "$envf" "deployed $tag to $project"
+  exit 0
 }
 
 main "$@"

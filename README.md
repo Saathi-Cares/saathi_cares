@@ -86,3 +86,11 @@ Code in the repository that no route, script or test uses today (PLAN.md §23.6)
 | `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `InvalidTransitionError` in `src/server/http/errors.ts` | Part of the PLAN.md §9.7 taxonomy | Used from Phase 1 (auth, RBAC, stage machines) |
 
 No infrastructure service is dormant: the only external service is Postgres, which the readiness check, the migration runner and the job queue all use.
+
+## Operations
+
+- Deploy: tag `vX.Y.Z` → GitHub Actions (`deploy.yml`) builds the image → approval on the `production` environment → `scripts/deploy-remote.sh prod vX.Y.Z` on the VPS (migrate, health wait with automatic rollback, smoke test through Cloudflare, Slack notice). Staging: `[staging]` in the commit message on `main`, or a manual run. Roll back: `scripts/rollback.sh prod`. Details: `docs/runbooks/deploy-and-rollback.md`.
+- Health: `infra/checks/check.sh` from the `deploy` user's crontab every 5 min → Slack on each failure and recovery, a digest at 08:00 and a monthly report; a hosted uptime monitor checks `/api/health/ready` and expects the `check.sh` heartbeat. Details: `infra/checks/README.md`.
+- Backups: every 6 h (00:15, 06:15, 12:15, 18:15 IST) to `/srv/saathi/backups/restic`, mirrored to the developer's machine daily, restore-tested monthly (03:30 IST on the 1st). `docs/runbooks/disaster-recovery.md`.
+- Logs: `infra/checks/logq.sh errors [since]`, `logq.sh request <id>`, `logq.sh slow [since]`, `logq.sh login-failures [since]` (`since` defaults to `2h`).
+- Runbooks in `docs/runbooks/`: `host-setup.md` (new VPS, step by step), `deploy-and-rollback.md`, `disaster-recovery.md`, `breach-response.md`, `key-envelope.md` (the printed page for the founder's sealed envelope).
