@@ -13,12 +13,18 @@ Nginx (`nginx:1.27-alpine`, service `nginx` in `infra/compose.yaml`) terminates 
 | `conf.d/staging.conf`               | Staging HTTPS server: basic auth, `X-Robots-Tag: noindex`, proxied to `staging-app-1:3000`.                                                                                                                                                           |
 | `snippets/cloudflare-real-ip.conf`  | Trusts `CF-Connecting-IP` only from Cloudflare's published ranges, so `$remote_addr` (logs, rate limits) is the visitor, not Cloudflare. A request from any other address keeps its own address and the header is ignored.                            |
 | `snippets/rate-limits.conf`         | Rate-limit zones keyed on the real client address: `login` and `public_forms` at 5 requests/minute, `api` at 120/minute. Rejections return 429.                                                                                                     |
-| `snippets/security-headers.conf`    | HSTS (two years, preload), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`. Sent on every status (`always`).                                                                                                              |
+| `snippets/security-headers.conf`    | HSTS (two years, preload) and `X-Content-Type-Options: nosniff`, on every status (`always`). The other security headers belong to the app (see below).                                                                                          |
 | `snippets/proxy.conf`               | Upstream settings for every proxied location: HTTP/1.1 keepalive, `Host`, `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto: https`, `X-Request-Id`, 5 s connect and 30 s read timeouts, no buffering.                                             |
 
 **Request ids.** `proxy.conf` sets `X-Request-Id` to Nginx's own `$request_id` (32 hex characters), so Nginx overwrites
 any client-supplied `X-Request-Id`: a caller cannot choose the id the app logs. The same value is in the access log's
 `request_id` field, which joins an Nginx line to the app's log lines for that request.
+
+**One owner per header.** Nginx sends `Strict-Transport-Security` and `X-Content-Type-Options`, because it terminates TLS
+and serves `/media/public/` itself. `next.config.ts` sends `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`
+(`camera=(), geolocation=(), microphone=()` until Phase 2). A header set in both places reaches the browser twice, so
+never add one to the other side. `/_next/static/` hides Next's `Cache-Control` and sends a single
+`Cache-Control: public, immutable, max-age=31536000`.
 
 **`add_header` inheritance.** A location that has any `add_header` of its own inherits none from the server block. Any
 location that adds a header (as `/media/public/` and `/_next/static/` do for `Cache-Control`) must also
@@ -47,7 +53,8 @@ Bash on Windows, run it with `PATH=/usr/bin:$PATH bash scripts/dev-cert.sh .loca
 ## Adding a rate-limited location
 
 1. Pick a zone from `snippets/rate-limits.conf`, or add one there (`limit_req_zone $binary_remote_addr zone=<name>:10m rate=<n>r/m;`).
-2. In `conf.d/app.conf`, add the location above the general `/api/` one (Nginx picks the longest matching prefix):
+2. In `conf.d/app.conf`, add the location next to the general `/api/` one (Nginx picks the longest matching prefix; use
+   `location = <path>` for a single endpoint, as `/api/v1/enquiries` does, so longer paths are not caught):
    `location /api/v1/<path> { limit_req zone=<name> burst=<n> nodelay; proxy_pass http://app; include /etc/nginx/snippets/proxy.conf; }`
 3. Run `nginx -t` in the container, then reload. Check that the request after the burst returns 429.
 
@@ -58,8 +65,9 @@ quick run is the first 429.
 
 Staging is a separate compose project (`-p staging`) on the shared `saathi_edge` network and is usually down. The
 staging upstream uses `server staging-app-1:3000 resolve;` with Docker's resolver (`127.0.0.11`), so Nginx re-resolves
-the name at run time: while staging is stopped, `staging.cares.saathiventures.com` returns 502 (and the error log has a
-"could not be resolved" line roughly every ten seconds), and it answers again once `staging-app-1` is running. A plain
+the name at run time: while staging is stopped, `staging.cares.saathiventures.com` returns 502, and it answers again
+once `staging-app-1` is running. By design, a stopped staging logs one "could not be resolved" error line every 30 to 60
+seconds (`resolver ... valid=60s`; measured locally: one every 34 s, because Docker's DNS answers SERVFAIL). A plain
 `server staging-app-1:3000;` would stop production Nginx from starting at all ("host not found in upstream") whenever
 staging is down. `scripts/deploy-remote.sh` still reloads Nginx after starting staging, which drops idle keepalive
 connections to a replaced container.
