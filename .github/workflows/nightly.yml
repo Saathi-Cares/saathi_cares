@@ -1,0 +1,36 @@
+name: nightly
+on:
+  schedule: [{ cron: '30 21 * * *' }] # 03:00 IST
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: saathi_test }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
+    # As in ci.yml; JOBS_ENABLED stays false until an e2e test exercises jobs.
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/saathi_test
+      MEDIA_ROOT: ./.test-media
+      JOBS_ENABLED: 'false'
+      LOG_LEVEL: warn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm audit --audit-level=high
+      - run: docker build -t app:nightly .
+      # Non-blocking (exit-code 0) per PLAN.md §11; the weekly review reads the table.
+      - uses: aquasecurity/trivy-action@0.28.0
+        with: { image-ref: 'app:nightly', severity: 'HIGH,CRITICAL', exit-code: '0', format: table }
+      - uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'

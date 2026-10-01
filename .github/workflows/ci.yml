@@ -1,0 +1,52 @@
+name: ci
+on:
+  push: { branches: ['**'] }
+  pull_request:
+concurrency: { group: 'ci-${{ github.ref }}', cancel-in-progress: true }
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: saathi_test }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
+    # The variables src/server/config.ts reads (APP_URL and MEDIA_SIGNING_SECRET are no longer required).
+    # JOBS_ENABLED stays false: the e2e smoke tests hit public pages and liveness only, none exercises jobs.
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/saathi_test
+      MEDIA_ROOT: ./.test-media
+      JOBS_ENABLED: 'false'
+      LOG_LEVEL: warn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run test:int
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --project=phone
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: playwright-report, retention-days: 7 }
+  # A separate job so the scan runs even when tests fail and never walks node_modules or .next.
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GITLEAKS_VERSION: 8.28.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gitleaks (pinned release binary)
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+      - run: '"$RUNNER_TEMP/gitleaks" detect --no-git --source . --redact --exit-code 1 || (echo "gitleaks found secrets" && exit 1)'
