@@ -53,7 +53,7 @@ A job enqueued inside `fn` with `enqueue(def, data, { tx })` is written in the s
 | --- | --- | --- |
 | `system.noop` | `src/server/jobs/boss.int.test.ts` only | Proves the queue round-trips. No product code sends it. |
 
-pg-boss creates and migrates its own `pgboss` schema on start, using the runtime connection (`DATABASE_URL`). This is the one place the app's runtime role performs DDL. Plan 0B's database init script is to grant `CREATE` on the database to `saathi_app` for this reason; that script does not exist yet.
+pg-boss creates and migrates its own `pgboss` schema on start, using the runtime connection (`DATABASE_URL`). This is the one place the app's runtime role performs DDL. `infra/postgres/init.sql` grants `CREATE` on the `saathi` database to `saathi_app` for this reason.
 
 ## Storage
 

@@ -1,0 +1,27 @@
+# Developer laptop: database and mail catcher only; the app runs with `npm run dev` on the host.
+#   docker compose -f infra/compose.yaml -f infra/compose.dev.yaml --env-file infra/.env.compose --profile dev up -d
+services:
+  postgres:
+    # 127.0.0.1:15432 because 5432 is often taken by another project's Postgres. Where 5432 is free,
+    # '5432:5432' works the same; put the published port in DATABASE_URL and DATABASE_URL_MIGRATIONS.
+    ports: ['127.0.0.1:15432:5432']
+    # The base file attaches postgres only to the `internal` network, and Docker publishes no ports for a
+    # container on internal networks alone; `dev` is an ordinary bridge network so the port above works.
+    networks: [internal, dev]
+    # `!override` replaces the base list instead of appending to it (Compose >= 2.24); appending would mount
+    # two volumes on /var/lib/postgresql/data and fail.
+    volumes: !override
+      - saathi-dev-pgdata:/var/lib/postgresql/data
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+      - ./postgres/init-test-db.sql:/docker-entrypoint-initdb.d/20-test.sql:ro
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ['dev']
+    ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
+    mem_limit: 64m
+    networks: [dev]
+volumes:
+  saathi-dev-pgdata: {}
+networks:
+  dev: {}

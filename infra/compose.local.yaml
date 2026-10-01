@@ -1,0 +1,10 @@
+# Local verification only: the production stack on a laptop, on ports that do not clash with other
+# projects. Production (infra/compose.yaml alone) keeps 80/443 and publishes no Postgres port.
+#   docker compose -f infra/compose.yaml -f infra/compose.local.yaml --env-file infra/.env.compose --profile core up -d
+services:
+  nginx:
+    ports: !override ['18080:80', '18443:443']
+  postgres:
+    ports: ['127.0.0.1:15432:5432']
+    # Docker publishes no ports for a container attached only to internal networks (see compose.dev.yaml).
+    networks: [internal, edge]

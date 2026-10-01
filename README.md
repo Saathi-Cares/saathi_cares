@@ -7,10 +7,10 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 ## Run it locally (10 minutes)
 
 1. Node 24 (`nvm use` reads `.nvmrc`), then `npm ci`.
-2. Postgres 16. Until Phase 0B's compose file exists:
-   `docker run --name saathi-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=saathi -p 5432:5432 -d postgres:16`
-   (if 5432 is taken, publish another port and use it in the URLs below).
-3. `cp .env.example .env`, then set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/saathi`. `DATABASE_URL_MIGRATIONS` can be left out; `npm run migrate` then uses `DATABASE_URL`.
+2. Postgres 16 and Mailpit from the compose dev profile: `cp infra/.env.compose.example infra/.env.compose` (the `change-me` passwords are fine on a laptop), then
+   `docker compose -f infra/compose.yaml -f infra/compose.dev.yaml --env-file infra/.env.compose --profile dev up -d`.
+   On first start `infra/postgres/init.sql` creates the roles `saathi_owner` and `saathi_app` with the passwords from `infra/.env.compose`, the `saathi` database, and (dev profile only) `saathi_test`. Postgres is published on `127.0.0.1:15432` (5432 is often taken by another project; where it is free you may change the mapping in `infra/compose.dev.yaml` to `5432:5432` and use 5432 below). Mailpit's web UI is http://localhost:8025, SMTP on 1025.
+3. `cp .env.example .env`. Its `DATABASE_URL` (`saathi_app`) and `DATABASE_URL_MIGRATIONS` (`saathi_owner`) already point at `127.0.0.1:15432` with the `change-me` passwords.
 4. `npm run migrate` applies the migrations (it reads `.env`).
 5. `npm run dev` (Next.js loads `.env` itself) and open http://localhost:8081.
 
@@ -30,7 +30,7 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 | `npm run lint` / `npm run typecheck` | ESLint (including the `src/server` ↔ UI import boundary and, in `src/server`, no interpolated values in log messages) / `tsc --noEmit` for the app, then `tsc --noEmit -p e2e` for the Playwright specs |
 | `npm run format` / `npm run format:check` | Prettier write / check |
 
-`npm run start` prints `"next start" does not work with "output: standalone" configuration`. It still serves the build, and the e2e tests use it. The production image (plan 0B) runs the standalone `server.js` with `node` instead.
+`npm run start` prints `"next start" does not work with "output: standalone" configuration`. It still serves the build, and the e2e tests use it. The production image (`Dockerfile`) runs the standalone `server.js` with `node` instead.
 
 `dist/migrate.js` looks for SQL files in a `migrations/` directory next to itself (`import.meta.dirname`); `MIGRATIONS_DIR` overrides that. `npm run build` runs a `postbuild` step that bundles `dist/migrate.js` and copies the SQL files to `dist/migrations/`, so after a build `node dist/migrate.js` needs no `MIGRATIONS_DIR`; the variable remains an optional override.
 
@@ -53,6 +53,7 @@ src/components/ UI: ui/ (shadcn primitives), layout/ (Header, Footer), sections/
 src/content/    site.ts, the static public-site content (replaced by the CMS in Phase 4)
 src/server/     backend: config, db, http, jobs, observability, storage, health (see src/server/README.md)
 e2e/            Playwright smoke tests
+infra/          Compose files (compose.yaml production, compose.dev.yaml laptop, compose.staging.yaml, compose.local.yaml local verification only) and postgres/ init and config
 docs/           API and internal changelogs, ADR index, council reviews, phase plans
 ```
 
