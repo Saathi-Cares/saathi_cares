@@ -19,9 +19,9 @@ services:
     image: postgres:16-alpine
     profiles: ['core', 'dev']
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
-      SAATHI_OWNER_PASSWORD: ${SAATHI_OWNER_PASSWORD:?set in .env}
-      SAATHI_APP_PASSWORD: ${SAATHI_APP_PASSWORD:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in the env file passed with --env-file}
+      SAATHI_OWNER_PASSWORD: ${SAATHI_OWNER_PASSWORD:?set in the env file passed with --env-file}
+      SAATHI_APP_PASSWORD: ${SAATHI_APP_PASSWORD:?set in the env file passed with --env-file}
     command: ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf']
     volumes:
       - ${DATA_ROOT:-/srv/saathi}/pgdata:/var/lib/postgresql/data
@@ -45,7 +45,7 @@ services:
     logging: *logging
     command: ['node', 'dist/migrate.js']
     environment:
-      DATABASE_URL_MIGRATIONS: postgres://saathi_owner:${SAATHI_OWNER_PASSWORD:?set in .env}@postgres:5432/saathi
+      DATABASE_URL_MIGRATIONS: postgres://saathi_owner:${SAATHI_OWNER_PASSWORD:?set in the env file passed with --env-file}@postgres:5432/saathi
     depends_on:
       postgres: { condition: service_healthy }
     mem_limit: 256m
@@ -58,7 +58,7 @@ services:
     # The app reads only these variables (src/server/config.ts).
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://saathi_app:${SAATHI_APP_PASSWORD:?set in .env}@postgres:5432/saathi
+      DATABASE_URL: postgres://saathi_app:${SAATHI_APP_PASSWORD:?set in the env file passed with --env-file}@postgres:5432/saathi
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MEDIA_ROOT: /data/media
       JOBS_ENABLED: 'true'
@@ -107,13 +107,15 @@ services:
     build: ./backup
     image: saathi-cares/backup:local
     profiles: ['core']
+    # crond runs as PID 1 otherwise; tini reaps the pg_dump/restic children cron leaves behind.
+    init: true
     environment:
       PGHOST: postgres
       PGUSER: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set in the env file passed with --env-file}
       PGDATABASE: saathi
       RESTIC_REPOSITORY: /backups/restic
-      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:?set in the env file passed with --env-file}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
     volumes:
       - ${DATA_ROOT:-/srv/saathi}/backups:/backups

@@ -25,7 +25,7 @@ restic backup --tag media --host saathi /data/media
 # Every dump has a new file name, so group by host and tags (restic's default groups by path, which would
 # make each dump its own group and keep all of them forever).
 restic forget --tag db --group-by host,tags --keep-hourly 28 --keep-daily 30 --keep-weekly 12 --keep-monthly 12 --prune --quiet
-restic forget --tag media --group-by host,tags --keep-daily 30 --keep-weekly 12 --keep-monthly 12 --prune --quiet
+restic forget --tag media --group-by host,tags --keep-hourly 28 --keep-daily 30 --keep-weekly 12 --keep-monthly 12 --prune --quiet
 restic check --read-data-subset=5% --quiet
 
 date +%s > /backups/state/last-backup-ok

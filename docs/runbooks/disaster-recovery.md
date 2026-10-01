@@ -11,8 +11,8 @@ scenarios, the rehearsal checklist and where the key envelope is.
 | Media (`/srv/saathi/media`) | `restic backup --tag media` | same repository | with every database backup |
 | The repository itself | `restic copy` by `scripts/mirror-backup.ps1` (Windows) or `scripts/mirror-backup.sh` | `%USERPROFILE%\saathi-backups\restic` on the developer machine | daily, Task Scheduler |
 
-Retention (`infra/backup/backup.sh`): database snapshots keep 28 hourly, 30 daily, 12 weekly and 12 monthly;
-media keeps 30 daily, 12 weekly and 12 monthly. Each run ends with `restic check --read-data-subset=5%`.
+Retention (`infra/backup/backup.sh`, PLAN.md §15.5): database and media snapshots follow one policy, 28 six-hourly
+(`--keep-hourly 28`; one run every 6 h), 30 daily, 12 weekly and 12 monthly. Each run ends with `restic check --read-data-subset=5%`.
 
 The repository is encrypted with `RESTIC_PASSWORD` (in `/srv/saathi/.env.prod` and in the key envelope). Without
 it the backups cannot be read by anyone, including us.
@@ -27,14 +27,19 @@ is stale.
 - `last-mirror-ok`: written over SSH by the mirror script on the developer machine.
 
 `backup.sh` refuses to start (exit 2, Slack `ERROR`) when `/backups` has less free space than twice the last dump
-plus 50 MB. A failing step stops the run; the reason is in `docker compose -p saathi logs backup`.
+plus 50 MB. A failing step stops the run; the reason is in `$C logs backup` (`$C` as
+in "Manual commands" below).
 
 ## Manual commands
 
+The full `-f` and `--env-file` paths make these work from any directory (the compose file refuses to load without
+the passwords from the env file).
+
 ```bash
-docker compose -p saathi exec backup backup.sh            # an extra backup now
-docker compose -p saathi exec backup restic snapshots     # list snapshots
-docker compose -p saathi exec backup restore-test.sh      # restore the newest dump into a scratch database
+C="docker compose -p saathi -f /srv/saathi/repo/infra/compose.yaml --env-file /srv/saathi/.env.prod"
+$C exec backup backup.sh            # an extra backup now
+$C exec backup restic snapshots     # list snapshots
+$C exec backup restore-test.sh      # restore the newest dump into a scratch database
 ```
 
 ## Restore (outline; Task 7 writes the timed procedure)
