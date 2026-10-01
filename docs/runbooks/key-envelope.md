@@ -26,7 +26,7 @@ for that purpose, and afterwards have every value in it changed.
 | `SAATHI_APP_PASSWORD` (application role) | |
 | GHCR read token: **name** and expiry only (the token itself is on the VPS and can be recreated by the GitHub owner) | |
 | GitHub organisation owner account (`Saathi-Cares`) | |
-| Cloudflare account owner (zone `saathiventures.com`) | |
+| Cloudflare account owner (zone `saathicares.org`) | |
 | Hosted uptime monitor: provider and account owner | |
 | Slack workspace and alert channel | |
 | Where the developer-machine backup mirror is (machine, folder) | |

@@ -373,7 +373,7 @@ Staging is started with `docker compose -p staging -f infra/compose.yaml -f infr
 ```bash
 IMAGE_TAG=latest
 DATA_ROOT=/srv/saathi
-APP_URL=https://cares.saathiventures.com
+APP_URL=https://saathicares.org
 LOG_LEVEL=info
 POSTGRES_PASSWORD=change-me
 SAATHI_OWNER_PASSWORD=change-me
@@ -518,7 +518,7 @@ server {
 server {
   listen 443 ssl;
   http2 on;
-  server_name cares.saathiventures.com;
+  server_name saathicares.org;
 
   ssl_certificate     /etc/nginx/certs/origin.pem;
   ssl_certificate_key /etc/nginx/certs/origin-key.pem;
@@ -563,7 +563,7 @@ upstream staging { server staging-app-1:3000; keepalive 4; }
 server {
   listen 443 ssl;
   http2 on;
-  server_name staging.cares.saathiventures.com;
+  server_name staging.saathicares.org;
 
   ssl_certificate     /etc/nginx/certs/origin.pem;
   ssl_certificate_key /etc/nginx/certs/origin-key.pem;
@@ -590,7 +590,7 @@ Add `docker compose -p saathi -f "$repo/infra/compose.yaml" --env-file /srv/saat
 set -euo pipefail
 out=${1:-./.local-certs}
 mkdir -p "$out"
-openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=cares.saathiventures.com" \
+openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=saathicares.org" \
   -keyout "$out/origin-key.pem" -out "$out/origin.pem" 2>/dev/null
 echo "wrote $out/origin.pem and origin-key.pem"
 ```
@@ -604,11 +604,11 @@ bash scripts/dev-cert.sh ./.local-certs
 DATA_ROOT=$PWD/.local-data mkdir -p .local-data/certs .local-data/media/public && cp .local-certs/* .local-data/certs/
 IMAGE_TAG=local DATA_ROOT=$PWD/.local-data docker compose -f infra/compose.yaml --env-file infra/.env.compose --profile core up -d
 docker compose -f infra/compose.yaml exec nginx nginx -t
-curl -sk -o /dev/null -w "%{http_code}\n" https://localhost/ -H "Host: cares.saathiventures.com"          # 200
-curl -sk -D - -o /dev/null https://localhost/ -H "Host: cares.saathiventures.com" | grep -i "strict-transport\|x-frame\|x-request"   # headers present
+curl -sk -o /dev/null -w "%{http_code}\n" https://localhost/ -H "Host: saathicares.org"          # 200
+curl -sk -D - -o /dev/null https://localhost/ -H "Host: saathicares.org" | grep -i "strict-transport\|x-frame\|x-request"   # headers present
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost/                                                # 301
-for i in $(seq 1 8); do curl -sk -o /dev/null -w "%{http_code} " https://localhost/api/v1/auth/login -H "Host: cares.saathiventures.com" -H "CF-Connecting-IP: 203.0.113.10"; done; echo   # 404 ×~6 then 429 (route does not exist yet; the limit still applies)
-curl -sk -o /dev/null -w "%{http_code}\n" https://localhost/api/v1/auth/login -H "Host: cares.saathiventures.com" -H "CF-Connecting-IP: 203.0.113.11"   # 404, not 429: a different client IP is a different bucket
+for i in $(seq 1 8); do curl -sk -o /dev/null -w "%{http_code} " https://localhost/api/v1/auth/login -H "Host: saathicares.org" -H "CF-Connecting-IP: 203.0.113.10"; done; echo   # 404 ×~6 then 429 (route does not exist yet; the limit still applies)
+curl -sk -o /dev/null -w "%{http_code}\n" https://localhost/api/v1/auth/login -H "Host: saathicares.org" -H "CF-Connecting-IP: 203.0.113.11"   # 404, not 429: a different client IP is a different bucket
 ```
 
 The `CF-Connecting-IP` header is only honoured from Cloudflare's ranges; for this local test, temporarily add `set_real_ip_from 0.0.0.0/0;` in a copied snippet mounted for the test, and remove it afterwards. State in the report that this was done and reverted.
@@ -746,7 +746,7 @@ Row-count assertions on clinical tables are added to this script in Phase 2 when
 # Mirrors the VPS restic repository to this machine. Run from Task Scheduler daily (see docs/runbooks/host-setup.md).
 # Requires: restic (winget install restic.restic), an SSH key that can read /srv/saathi/backups on the VPS.
 param(
-  [string]$VpsHost = "deploy@cares.saathiventures.com",
+  [string]$VpsHost = "deploy@saathicares.org",
   [string]$Local = "$env:USERPROFILE\saathi-backups\restic"
 )
 $ErrorActionPreference = "Stop"
@@ -770,7 +770,7 @@ Write-Host "mirror ok $(Get-Date)"
 #!/usr/bin/env bash
 # Mirrors the VPS restic repository to this machine. Needs restic and an SSH key that can read /srv/saathi/backups.
 set -euo pipefail
-VPS_HOST=${1:-deploy@cares.saathiventures.com}
+VPS_HOST=${1:-deploy@saathicares.org}
 LOCAL=${2:-$HOME/saathi-backups/restic}
 : "${RESTIC_PASSWORD:?Set RESTIC_PASSWORD (the escrowed passphrase)}"
 mkdir -p "$LOCAL"
@@ -1250,7 +1250,7 @@ CI cannot be verified without pushing. The repository owner pushes when ready (m
 5. Cloudflare: add the domain, proxy on, SSL mode "Full (strict)", create an Origin CA certificate (15 years) → `/srv/saathi/certs/origin.pem` and `origin-key.pem` (mode 600); `staging.` subdomain proxied to the same IP; `htpasswd` for staging.
 6. `/srv/saathi/.env.prod` and `.env.staging` from `infra/.env.compose.example`, mode 600; generate secrets with `openssl rand -hex 32`; `IMAGE_TAG` set to the first release tag.
 7. Host cron: `crontab /srv/saathi/repo/infra/checks/crontab` as `deploy`; install `jq`, `curl`.
-8. First start: `docker compose -p saathi -f infra/compose.yaml --env-file /srv/saathi/.env.prod --profile core up -d`; confirm `docker compose ps` all healthy; `curl https://cares.saathiventures.com/api/health/ready` through Cloudflare returns `ok`.
+8. First start: `docker compose -p saathi -f infra/compose.yaml --env-file /srv/saathi/.env.prod --profile core up -d`; confirm `docker compose ps` all healthy; `curl https://saathicares.org/api/health/ready` through Cloudflare returns `ok`.
 9. Backups: `docker compose exec backup backup.sh` once by hand; `restore-test.sh` once by hand; on the developer machine, register `scripts/mirror-backup.ps1` in Task Scheduler (daily 22:00, run whether logged in or not, `RESTIC_PASSWORD` from Windows Credential Manager via `cmdkey`, documented step by step) and run it once.
 10. Hosted uptime monitor: create a free account, add an HTTPS monitor for `/api/health/ready` (5 min), a heartbeat monitor (expects a ping every 5 min, grace 15) whose URL becomes `UPTIME_HEARTBEAT_URL` in `.env.prod`, an SSL expiry monitor, and Slack as the notification channel.
 11. GitHub: create environments `staging` and `production` (production: required reviewer = the owner), add secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`; enable Actions.
@@ -1291,11 +1291,11 @@ This task is performed by the repository owner with the implementer's guidance, 
 
 - [ ] **Step 1:** Follow `docs/runbooks/host-setup.md` steps 1–11 on the real VPS. Tick each step in the runbook as it is done; correct the runbook wherever reality differed (that correction is part of the deliverable).
 
-- [ ] **Step 2:** Push the Phase 0 branch (owner). Confirm `ci.yml` is green. Create tag `v0.1.0`; approve the production deploy; confirm `deploy-remote.sh` reports `healthy` and `https://cares.saathiventures.com/api/health/ready` returns `ok` through Cloudflare (the public pages remain on staging and the old site stays live: the DNS for the apex is switched in Phase 4; until then, point only `app.` or the future hostname at the VPS, per the owner's choice, and record it).
+- [ ] **Step 2:** Push the Phase 0 branch (owner). Confirm `ci.yml` is green. Create tag `v0.1.0`; approve the production deploy; confirm `deploy-remote.sh` reports `healthy` and `https://saathicares.org/api/health/ready` returns `ok` through Cloudflare (the public pages remain on staging and the old site stays live: the DNS for the apex is switched in Phase 4; until then, point only `app.` or the future hostname at the VPS, per the owner's choice, and record it).
 
 - [ ] **Step 3:** Run `scripts/rollback.sh prod` to `latest`, confirm the site still answers, then redeploy `v0.1.0`. Record both timings.
 
-- [ ] **Step 3b (Review Focus 4):** On staging, deploy a branch containing a deliberately broken migration file (`9999_broken.sql` with `create table this is not sql;`). Confirm `deploy-remote.sh staging` fails at `migrate`, the previous staging `app` container keeps running and answering, and `rollback.sh staging` is not needed because the app image never changed. Delete the file afterwards. Record the compose output. Then the production-shaped check, because staging has no Nginx in its project: on the production project (`-p saathi`, `--profile core`, Nginx included), before the first real release, run the same stage sequence `deploy-remote.sh` uses with the broken file bind-mounted into `migrate` by an extra `-f` overlay (`$C -f <overlay> run --rm migrate` must fail), then confirm `$C ps app` still shows the old container healthy and `curl -fsS https://cares.saathiventures.com/api/health/ready` still answers. Remove the overlay and the file. (Run locally on the core profile with `compose.local.yaml` in the final fix wave, 2026-10-01.)
+- [ ] **Step 3b (Review Focus 4):** On staging, deploy a branch containing a deliberately broken migration file (`9999_broken.sql` with `create table this is not sql;`). Confirm `deploy-remote.sh staging` fails at `migrate`, the previous staging `app` container keeps running and answering, and `rollback.sh staging` is not needed because the app image never changed. Delete the file afterwards. Record the compose output. Then the production-shaped check, because staging has no Nginx in its project: on the production project (`-p saathi`, `--profile core`, Nginx included), before the first real release, run the same stage sequence `deploy-remote.sh` uses with the broken file bind-mounted into `migrate` by an extra `-f` overlay (`$C -f <overlay> run --rm migrate` must fail), then confirm `$C ps app` still shows the old container healthy and `curl -fsS https://saathicares.org/api/health/ready` still answers. Remove the overlay and the file. (Run locally on the core profile with `compose.local.yaml` in the final fix wave, 2026-10-01.)
 
 - [ ] **Step 4:** Trigger each alert in §14.4 once (runbook step 12) and watch Slack. Record the list with timestamps.
 

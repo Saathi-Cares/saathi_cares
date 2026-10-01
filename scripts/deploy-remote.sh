@@ -66,8 +66,8 @@ main() {
   local ref=${DEPLOY_REF:-main}
   local repo=/srv/saathi/repo envf files name host
   case "$project" in
-    prod)    envf=/srv/saathi/.env.prod;    files="-f $repo/infra/compose.yaml"; name=saathi; host=cares.saathiventures.com ;;
-    staging) envf=/srv/saathi/.env.staging; files="-f $repo/infra/compose.yaml -f $repo/infra/compose.staging.yaml"; name=staging; host=staging.cares.saathiventures.com ;;
+    prod)    envf=/srv/saathi/.env.prod;    files="-f $repo/infra/compose.yaml"; name=saathi; host=saathicares.org ;;
+    staging) envf=/srv/saathi/.env.staging; files="-f $repo/infra/compose.yaml -f $repo/infra/compose.staging.yaml"; name=staging; host=staging.saathicares.org ;;
     *) echo "unknown project $project"; exit 1 ;;
   esac
   D_PROJECT=$project D_TAG=$tag D_ENVF=$envf D_STAGE=guard

@@ -1,15 +1,16 @@
 # Nginx perimeter
 
-Nginx (`nginx:1.27-alpine`, service `nginx` in `infra/compose.yaml`) terminates TLS for `cares.saathiventures.com` and
-`staging.cares.saathiventures.com`, serves `/media/public/*` from disk and proxies everything else to `app:3000`. Port
-80 only answers `/nginx-health` (the container health check) and redirects everything else to HTTPS.
+Nginx (`nginx:1.27-alpine`, service `nginx` in `infra/compose.yaml`) terminates TLS for `saathicares.org`,
+`www.saathicares.org` (a 301 to the apex) and `staging.saathicares.org`, serves `/media/public/*` from disk and proxies
+everything else to `app:3000`. Port 80 only answers `/nginx-health` (the container health check) and redirects
+everything else to HTTPS (`www.saathicares.org` straight to `https://saathicares.org`).
 
 ## Files
 
 | File                                | What it does                                                                                                                                                                                                                                          |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `nginx.conf`                        | Global settings: no version in `Server`, 2 MB body limit, JSON access log (`request_id`, `upstream_ms`, `cf_ray`), gzip, and the includes below.                                                                                                      |
-| `conf.d/app.conf`                   | Port 80 server (health and redirect) and the production HTTPS server with its locations.                                                                                                                                                              |
+| `conf.d/app.conf`                   | Port 80 server (health and redirect), the `www` to apex redirects (ports 80 and 443) and the production HTTPS server with its locations.                                                                                                              |
 | `conf.d/staging.conf`               | Staging HTTPS server: basic auth, `X-Robots-Tag: noindex`, proxied to `staging-app-1:3000`.                                                                                                                                                           |
 | `snippets/cloudflare-real-ip.conf`  | Trusts `CF-Connecting-IP` only from Cloudflare's published ranges, so `$remote_addr` (logs, rate limits) is the visitor, not Cloudflare. A request from any other address keeps its own address and the header is ignored.                            |
 | `snippets/rate-limits.conf`         | Rate-limit zones keyed on the real client address: `login` and `public_forms` at 5 requests/minute, `api` at 120/minute. Rejections return 429.                                                                                                     |
@@ -85,7 +86,7 @@ forgets its own `set` still sends `Retry-After: 60`; give it `set $retry_after <
 
 Staging is a separate compose project (`-p staging`) on the shared `saathi_edge` network and is usually down. The
 staging upstream uses `server staging-app-1:3000 resolve;` with Docker's resolver (`127.0.0.11`), so Nginx re-resolves
-the name at run time: while staging is stopped, `staging.cares.saathiventures.com` returns 502, and it answers again
+the name at run time: while staging is stopped, `staging.saathicares.org` returns 502, and it answers again
 once `staging-app-1` is running. By design, a stopped staging logs one "could not be resolved" error line every 30 to 60
 seconds (`resolver ... valid=60s`; measured locally: one every 34 s, because Docker's DNS answers SERVFAIL). A plain
 `server staging-app-1:3000;` would stop production Nginx from starting at all ("host not found in upstream") whenever

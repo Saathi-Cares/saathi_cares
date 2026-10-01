@@ -38,7 +38,7 @@ What `deploy-remote.sh prod <tag>` does, in order:
    only at start or reload, and the recreated container can have a new address (without the reload it answered 502 in
    a local test). A failed test or reload appends `nginx reload failed (...)` to `deploys.log` and posts one `[ALERT]`,
    but does not stop the deploy: the smoke test that follows fails if Nginx cannot reach the new app.
-9. Smoke test through the edge: `curl -fsS --max-time 10 https://cares.saathiventures.com/api/health/ready`, up to 12
+9. Smoke test through the edge: `curl -fsS --max-time 10 https://saathicares.org/api/health/ready`, up to 12
    tries 5 s apart. Appends a `smoke` line to `deploys.log`.
 10. Only when the smoke test passes: writes the previous tag to `/srv/saathi/saathi.previous-tag` and the deployed
    commit to `saathi.previous-ref`, appends an `ok` line, posts `deployed <tag> to prod`, exit 0.
@@ -78,7 +78,7 @@ chosen branch, with that branch as `DEPLOY_REF`.
 ## Staging
 
 Staging is a second compose project (`-p staging`) on the same VPS, behind basic auth at
-`https://staging.cares.saathiventures.com`, attached to production's `saathi_edge` network. Production must be running
+`https://staging.saathicares.org`, attached to production's `saathi_edge` network. Production must be running
 (its Nginx serves staging).
 
 - **Deploy:** push to `main` with `[staging]` in the head commit message, or Actions → deploy → Run workflow on
@@ -111,7 +111,7 @@ database, does not wait for health, posts to Slack only on a failed reload, and 
 
 ```bash
 $C ps app
-curl -fsS https://cares.saathiventures.com/api/health/ready
+curl -fsS https://saathicares.org/api/health/ready
 ```
 
 The older image must work with the newer schema. That is what the expand/contract rule (below) guarantees; a release
@@ -124,7 +124,7 @@ failed one, and a rollback by hand:
 
 ```text
 2026-10-05T10:12:03+05:30 deploy prod -> v0.2.0 ref=v0.2.0 (3f2a9c1); destructive check: migrations since 8d41e07...
-2026-10-05T10:13:40+05:30 smoke prod v0.2.0 https://cares.saathiventures.com/api/health/ready: ok
+2026-10-05T10:13:40+05:30 smoke prod v0.2.0 https://saathicares.org/api/health/ready: ok
 2026-10-05T10:13:40+05:30 ok prod v0.2.0 (previous v0.1.0)
 2026-10-09T15:01:12+05:30 deploy prod -> v0.3.0 ref=v0.3.0 (a91c0d4); destructive check: migrations since 3f2a9c1...
 2026-10-09T15:01:30+05:30 failed prod v0.3.0 at migrate (exit 1); IMAGE_TAG restored to v0.2.0

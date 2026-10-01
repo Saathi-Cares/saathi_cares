@@ -120,7 +120,7 @@ decide with the owner which snapshot to use: the newest one taken **before** the
    $C exec postgres psql -U postgres -d postgres -c "alter database saathi rename to saathi_damaged_$(date +%Y%m%d)"
    $C exec postgres psql -U postgres -d postgres -c "alter database saathi_restore rename to saathi"
    $C up -d          # migrate applies only migrations newer than the snapshot, then app starts
-   curl -fsS https://cares.saathiventures.com/api/health/ready
+   curl -fsS https://saathicares.org/api/health/ready
    ```
 
    `check.sh` may alert during the minute in which `saathi` does not exist or the app is stopped; mute it beforehand
@@ -200,12 +200,12 @@ Needs: the developer machine with the mirror (or a copy of `%USERPROFILE%\saathi
    from the VPS itself (`-k` because the Origin CA certificate is trusted only by Cloudflare):
 
    ```bash
-   curl -fsS -k --resolve cares.saathiventures.com:443:127.0.0.1 https://cares.saathiventures.com/api/health/ready
+   curl -fsS -k --resolve saathicares.org:443:127.0.0.1 https://saathicares.org/api/health/ready
    ```
 
-6. **Switch DNS.** In Cloudflare, point the `cares` and `staging.cares` A records (and the DNS-only SSH name, if used)
+6. **Switch DNS.** In Cloudflare, point the `@`, `www` and `staging` A records (and the DNS-only SSH name, if used)
    at the new IP. They are proxied, so the change is live within a minute or two. Then, from a laptop:
-   `curl -fsS https://cares.saathiventures.com/api/health/ready`.
+   `curl -fsS https://saathicares.org/api/health/ready`.
 
 7. **Afterwards.** Update `VPS_HOST` in GitHub and `-VpsHost` in the developer's `run-mirror.ps1`; run the mirror
    once; run `$C exec backup backup.sh`; finish `host-setup.md` steps 9 to 11; confirm the next `check.sh --digest`

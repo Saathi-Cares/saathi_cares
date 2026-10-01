@@ -14,7 +14,7 @@ Conventions:
   ```
 
 - `<VPS_IP>` is the server's public IPv4 address. SSH always goes to the IP (or a DNS-only hostname, step 5), never to
-  `cares.saathiventures.com`: that name is proxied by Cloudflare, which does not forward port 22.
+  `saathicares.org`: that name is proxied by Cloudflare, which does not forward port 22.
 
 What lives where when you are done:
 
@@ -190,18 +190,17 @@ is `/dev/vdb`). This erases the volume.
 
 ## 5. Cloudflare and certificates
 
-In the Cloudflare dashboard for `saathiventures.com`:
+In the Cloudflare dashboard for the zone `saathicares.org`:
 
-- [ ] DNS: `A cares → <VPS_IP>`, proxied (orange cloud). `A staging.cares → <VPS_IP>`, proxied. Optionally
-  `A ssh.cares → <VPS_IP>`, **DNS only** (grey cloud), as a stable name for SSH, the mirror and `VPS_HOST`.
+- [ ] DNS: `A @ → <VPS_IP>` (the apex, `saathicares.org`), proxied (orange cloud). `A www → <VPS_IP>`, proxied (Nginx
+  redirects `www.saathicares.org` to the apex with a 301). `A staging → <VPS_IP>`, proxied. Optionally
+  `A ssh → <VPS_IP>`, **DNS only** (grey cloud), as a stable name for SSH, the mirror and `VPS_HOST`.
 - [ ] SSL/TLS → Overview: encryption mode **Full (strict)**.
-- [ ] Edge certificate for staging: Cloudflare's free Universal SSL certificate covers the apex and one level of
-  subdomain (`*.saathiventures.com`). `staging.cares.saathiventures.com` is two levels deep and is **not** covered, so
-  browsers will reject it. Owner to choose: Advanced Certificate Manager (paid) for that name, or a one-level staging
-  name (which means changing `server_name` in `infra/nginx/conf.d/staging.conf` and the staging host in
-  `scripts/deploy-remote.sh`). Check SSL/TLS → Edge Certificates after adding the record.
-- [ ] SSL/TLS → Origin Server → Create Certificate: hostnames `cares.saathiventures.com` and
-  `*.cares.saathiventures.com`, validity 15 years. Save the two text blocks on the VPS:
+- [ ] Edge certificate: `staging.saathicares.org` is covered by Cloudflare's free Universal SSL certificate because it
+  is one label below the zone.
+- [ ] SSL/TLS → Origin Server → Create Certificate: hostnames `saathicares.org`, `www.saathicares.org` and
+  `staging.saathicares.org` (all three must be listed: Nginx serves all three names with this one certificate),
+  validity 15 years. Save the two text blocks on the VPS:
 
   ```bash
   sudo nano /srv/saathi/certs/origin.pem          # the certificate
@@ -286,7 +285,7 @@ In the Cloudflare dashboard for `saathiventures.com`:
 - [ ] Through Cloudflare, from the VPS and from a laptop:
 
   ```bash
-  curl -fsS https://cares.saathiventures.com/api/health/ready
+  curl -fsS https://saathicares.org/api/health/ready
   ```
 
   Expect HTTP 200 with `{"ok":true,"checks":{"database":"ok","storage":"ok","jobs":"ok"}}`. A 503 names the failing
@@ -322,7 +321,7 @@ In the Cloudflare dashboard for `saathiventures.com`:
 - [ ] On the developer's Windows machine, set up the daily mirror (`scripts/mirror-backup.ps1`). The script takes
   two parameters, `-VpsHost` (required, no default) and `-Local` (default `%USERPROFILE%\saathi-backups\restic`), and
   reads the passphrase only from `$env:RESTIC_PASSWORD`. `-VpsHost` is `deploy@<VPS_IP>` or `deploy@` the DNS-only
-  name from step 5, never `cares.saathiventures.com`: that name is proxied by Cloudflare, which does not carry SSH.
+  name from step 5, never `saathicares.org`: that name is proxied by Cloudflare, which does not carry SSH.
   (`scripts/mirror-backup.sh`, for a Linux or macOS machine, takes the same host as its required first argument.)
 
   1. Install restic: `winget install restic.restic`. Check `ssh deploy@<VPS_IP>` works without a prompt (an SSH key
@@ -371,11 +370,11 @@ PLAN.md §14.3/§14.4 and D24: a free hosted service. **Owner to choose** the pr
 
 Then:
 
-- [ ] HTTPS monitor: `https://cares.saathiventures.com/api/health/ready`, every 5 min, expect HTTP 200.
+- [ ] HTTPS monitor: `https://saathicares.org/api/health/ready`, every 5 min, expect HTTP 200.
 - [ ] Heartbeat monitor: period 5 min, grace 15 min. Put its ping URL into `/srv/saathi/.env.prod` as
   `UPTIME_HEARTBEAT_URL=<url>`. `check.sh` reads that line on every run and pings it only when every unmuted check
   passed, so no ping for 15 minutes means the VPS, cron or a check is down.
-- [ ] SSL expiry monitor for `cares.saathiventures.com`.
+- [ ] SSL expiry monitor for `saathicares.org`.
 - [ ] Slack channel: the same channel as `SLACK_WEBHOOK_URL`. Record the provider and account owner in the key envelope.
 
 ## 11. GitHub

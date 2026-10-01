@@ -17,7 +17,7 @@ Stop the damage first; preserve evidence second; investigate third.
 
 - **Take the site offline if data is leaking through it:** `$C stop app nginx` (the backup container and Postgres
   keep running). The hosted uptime monitor will alert; that is expected.
-- **Block IPs at Cloudflare:** in the dashboard for `saathiventures.com`, Security → WAF: an IP access rule (action
+- **Block IPs at Cloudflare:** in the dashboard for `saathicares.org`, Security → WAF: an IP access rule (action
   Block) or a custom rule for the address or range. Nginx sees visitors only through Cloudflare, so the block belongs
   there.
 - **Revoke sessions:** **available from Phase 1** (the app has no login yet). Phase 1 adds the command; until then

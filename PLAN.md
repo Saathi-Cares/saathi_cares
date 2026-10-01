@@ -155,7 +155,7 @@ Summarised from `ARCHITECTURE_AUDIT.md`:
 
 ### 4.2 Request path (annotated)
 
-1. Browser resolves `cares.saathiventures.com`. With Cloudflare proxied, static assets are cached at the edge and known-bad traffic is dropped before it reaches us.
+1. Browser resolves `saathicares.org`. With Cloudflare proxied, static assets are cached at the edge and known-bad traffic is dropped before it reaches us.
 2. Nginx terminates TLS, applies security headers and rate limits (`/api/v1/auth/login` 5/min/IP, `/api/v1/enquiries` 5/min/IP, `/api/v1/donations` 10/min/IP), and proxies to the Next.js container on the internal Docker network.
 3. `proxy.ts` (Next.js 16's renamed middleware) attaches a request id, validates the `Origin` header on mutating requests, and redirects unauthenticated `/admin/*` hits to login. It does **not** make authorisation decisions.
 4. **Public pages** render as React Server Components. They call `server/modules/cms` directly (no HTTP hop), read published content, and are cached with `revalidateTag('cms:home')`; publishing content invalidates the tag. Published public content is cached. Phase 4 verifies that previously cached public pages remain renderable when PostgreSQL is unavailable; uncached routes and dynamic features (contact form, donations, admin) fail to their error boundaries during an outage. This is a resilience property of the cache, not a claim that the site survives arbitrary database failures.

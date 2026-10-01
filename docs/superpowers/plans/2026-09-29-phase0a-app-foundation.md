@@ -192,7 +192,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-inter', display: 'swap' });
 const lora = Lora({ subsets: ['latin'], weight: ['400', '500', '600', '700'], style: ['normal', 'italic'], variable: '--font-lora', display: 'swap' });
 
-const siteUrl = 'https://cares.saathiventures.com';
+const siteUrl = 'https://saathicares.org';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

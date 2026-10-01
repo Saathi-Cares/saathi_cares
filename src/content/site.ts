@@ -162,7 +162,7 @@ export const org: OrgContent = {
   summary:
     'Taking oral healthcare to the last mile. We are a group of dedicated dental professionals committed to providing quality dental care to underserved communities across India.',
   parent: 'Saathi Ventures',
-  url: 'https://cares.saathiventures.com',
+  url: 'https://saathicares.org',
   email: 'cares@saathiventures.com',
   address: {
     lines: ['Saathi Ventures Foundation', 'Sector 15, Gurugram', 'Haryana 122001, India'],
