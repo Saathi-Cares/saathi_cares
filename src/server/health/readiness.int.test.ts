@@ -1,21 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Capture log lines instead of writing them to stdout, so the log contract can be asserted.
-const { lines } = vi.hoisted(() => ({ lines: [] as string[] }));
+vi.mock('../observability/logger', () => import('@/test/capture-logger').then((m) => m.mockLoggerModule()));
 
-vi.mock('../observability/logger', async () => {
-  const actual = await vi.importActual<typeof import('../observability/logger')>('../observability/logger');
-  const captured = actual.createLogger({
-    level: 'info',
-    destination: { write: (s: string) => lines.push(s) },
-  });
-  return { ...actual, getLogger: () => captured };
-});
-
+import { clearLogLines, logLines, parsedLogLines } from '@/test/capture-logger';
 import { checkReadiness } from './readiness';
 
 beforeEach(() => {
-  lines.length = 0;
+  clearLogLines();
 });
 
 describe('checkReadiness', () => {
@@ -25,7 +16,7 @@ describe('checkReadiness', () => {
     expect(r.checks.storage).toBe('ok');
     expect(r.checks.jobs).toBe('ok');
     expect(r.ok).toBe(true);
-    expect(lines).toEqual([]);
+    expect(logLines).toEqual([]);
   });
 
   it('reports the failing check without throwing', async () => {
@@ -47,9 +38,7 @@ describe('checkReadiness', () => {
     expect(body).not.toContain('/data/media');
 
     // The detail goes to the log instead, one warn line per failed check.
-    const logged = lines.map(
-      (l) => JSON.parse(l) as { level: number; msg: string; check: string; err: { message: string } },
-    );
+    const logged = parsedLogLines<{ level: number; msg: string; check: string; err: { message: string } }>();
     expect(logged.map((l) => [l.level, l.msg, l.check])).toEqual(
       expect.arrayContaining([
         [40, 'readiness check failed', 'database'],

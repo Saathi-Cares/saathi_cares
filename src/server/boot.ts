@@ -18,6 +18,9 @@ export async function boot(): Promise<void> {
     logger.info({ signal }, 'shutting down');
     await stopJobs().catch((err) => logger.error({ err }, 'stopJobs failed'));
     await closeDb().catch((err) => logger.error({ err }, 'closeDb failed'));
+    // why: the container sets NEXT_MANUAL_SIG_HANDLE=true (plan 0B), so Next leaves SIGTERM/SIGINT to this handler
+    // and the process ends here, after jobs and the pool are closed. Without that variable Next's own handler may
+    // exit first and cut stopJobs short.
     process.exit(0);
   };
   process.once('SIGTERM', () => void shutdown('SIGTERM'));

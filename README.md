@@ -10,7 +10,7 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 2. Postgres 16. Until Phase 0B's compose file exists:
    `docker run --name saathi-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=saathi -p 5432:5432 -d postgres:16`
    (if 5432 is taken, publish another port and use it in the URLs below).
-3. `cp .env.example .env`, then set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/saathi` and a `MEDIA_SIGNING_SECRET` of at least 32 characters (`openssl rand -hex 32`). `DATABASE_URL_MIGRATIONS` can be left out; it defaults to `DATABASE_URL`.
+3. `cp .env.example .env`, then set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/saathi`. `DATABASE_URL_MIGRATIONS` can be left out; `npm run migrate` then uses `DATABASE_URL`.
 4. `npm run migrate` applies the migrations (it reads `.env`).
 5. `npm run dev` (Next.js loads `.env` itself) and open http://localhost:8081.
 
@@ -25,8 +25,9 @@ Phase 0A is built: the public pages and the server foundation. There is no login
 | `npm run build:migrate` | Bundles the migration CLI into `dist/migrate.js` (ESM, with a `createRequire` banner for CommonJS dependencies) |
 | `npm run test` | Unit tests; every `*.int.test.ts` file is excluded, so no database is needed |
 | `npm run test:int` | `vitest run int.test`: the integration tests, against a real Postgres (see "Test database") |
+| `npm run test:all` | `npm run test`, then `npm run test:int` |
 | `npm run test:e2e` | Playwright smoke tests on a phone (Pixel 7) and a desktop profile; starts `npm run start` (waiting up to 120 s for `/api/health`) unless a server already answers on 3000 or `E2E_BASE_URL` is set |
-| `npm run lint` / `npm run typecheck` | ESLint (including the `src/server` ↔ UI import boundary) / `tsc --noEmit` |
+| `npm run lint` / `npm run typecheck` | ESLint (including the `src/server` ↔ UI import boundary and, in `src/server`, no interpolated values in log messages) / `tsc --noEmit` for the app, then `tsc --noEmit -p e2e` for the Playwright specs |
 | `npm run format` / `npm run format:check` | Prettier write / check |
 
 `npm run start` prints `"next start" does not work with "output: standalone" configuration`. It still serves the build, and the e2e tests use it. The production image (plan 0B) runs the standalone `server.js` with `node` instead.
@@ -75,7 +76,9 @@ Code in the repository that no route, script or test uses today (PLAN.md §23.6)
 | What | Why it is here | What activates it |
 | --- | --- | --- |
 | `src/components/ui/*` except `button.tsx` (the other shadcn primitives), `src/hooks/use-mobile.tsx`, `src/hooks/use-toast.ts` | Carried over from the initial commit (the Vite app) | Imported by a page or component, from Phase 1's portal screens on |
-| npm packages used only by those primitives: `cmdk`, `embla-carousel-react`, `input-otp`, `react-hook-form`, `react-resizable-panels`, `recharts` | Dependencies of the primitives above | Same as above |
+| npm packages used only by those primitives: `cmdk`, `embla-carousel-react`, `input-otp`, `react-hook-form`, `react-resizable-panels`, `recharts`, and all `@radix-ui/*` except `react-slot` (used only by the dormant shadcn files) | Dependencies of the primitives above | Same as above |
+| `StorageAdapter.put`, `get`, `exists` and `delete` (`src/server/storage/`) | PLAN.md D20 local media storage; only the readiness probe and the unit tests call it today | Phase 2 (clinical photos and media uploads) |
+| `enqueue()` (`src/server/jobs/boss.ts`) | The job queue's producer side; only `boss.int.test.ts` calls it | Phase 1 (email and SMS jobs) |
 | `AuthenticationError`, `MfaRequiredError`, `ForbiddenError`, `InvalidTransitionError` in `src/server/http/errors.ts` | Part of the PLAN.md §9.7 taxonomy | Used from Phase 1 (auth, RBAC, stage machines) |
 
 No infrastructure service is dormant: the only external service is Postgres, which the readiness check, the migration runner and the job queue all use.

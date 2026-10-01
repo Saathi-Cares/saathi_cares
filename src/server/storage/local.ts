@@ -7,24 +7,20 @@ import { pipeline } from 'node:stream/promises';
 import { ExternalServiceError, NotFoundError, ValidationError } from '../http/errors';
 import type { PutResult, StorageAdapter } from './adapter';
 
+// Every segment starts with a letter or digit, so `.` and `..` segments cannot occur.
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
 
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private readonly root: string) {}
 
   private resolve(key: string): string {
-    if (!KEY_PATTERN.test(key) || key.includes('..')) throw new ValidationError(`Invalid storage key`);
     const full = path.resolve(this.root, key);
-    if (!full.startsWith(path.resolve(this.root) + path.sep))
+    if (!KEY_PATTERN.test(key) || !full.startsWith(path.resolve(this.root) + path.sep))
       throw new ValidationError('Invalid storage key');
     return full;
   }
 
-  async put(
-    key: string,
-    data: Buffer | NodeJS.ReadableStream,
-    _opts: { contentType: string },
-  ): Promise<PutResult> {
+  async put(key: string, data: Buffer | NodeJS.ReadableStream): Promise<PutResult> {
     const full = this.resolve(key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     const hash = createHash('sha256');
@@ -60,11 +56,13 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async exists(key: string): Promise<boolean> {
+    const full = this.resolve(key);
     try {
-      await fs.access(this.resolve(key));
+      await fs.access(full);
       return true;
-    } catch {
-      return false; // absence is the answer, not a failure
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false; // absence is the answer, not a failure
+      throw err;
     }
   }
 

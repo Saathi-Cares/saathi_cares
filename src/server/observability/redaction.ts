@@ -1,17 +1,25 @@
-export const REDACTED_KEYS: ReadonlySet<string> = new Set([
+/** Field names whose values are never logged. Matched after `normaliseKey`, so `medicalHistory` and `Set-Cookie` count. */
+export const REDACTED_KEYS: readonly string[] = [
   // credentials
   'password',
   'password_hash',
   'mfa_secret',
   'mfa_secret_enc',
   'token',
+  'access_token',
+  'refresh_token',
+  'api_key',
   'secret',
   'authorization',
   'cookie',
+  'set_cookie',
   // tier 2 identifiers (PLAN.md §8.9)
   'phone',
+  'phone_number',
   'alt_phone',
+  'mobile',
   'email',
+  'email_address',
   'address',
   'address_line',
   'guardian_name',
@@ -39,13 +47,24 @@ export const REDACTED_KEYS: ReadonlySet<string> = new Set([
   'notes',
   'baseline',
   'content',
-]);
+];
+
+/** Case and separators are ignored: `medical_history`, `medicalHistory` and `Medical-History` are one key. */
+export function normaliseKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const NORMALISED_KEYS: ReadonlySet<string> = new Set(REDACTED_KEYS.map(normaliseKey));
+
+export function isRedactedKey(key: string): boolean {
+  return NORMALISED_KEYS.has(normaliseKey(key));
+}
 
 const CENSOR = '[redacted]';
 // why: bounds recursion so a deeply nested payload cannot blow the stack or bloat a log line.
 const MAX_DEPTH = 32;
 // why: shared substructures are re-walked at each occurrence, so without a budget a shared graph is exponential (logging-path DoS).
-const MAX_NODES = 20_000;
+export const MAX_NODES = 20_000;
 
 type Budget = { nodes: number };
 
@@ -71,7 +90,7 @@ function walk(value: unknown, ancestors: Set<object>, budget: Budget, depth: num
     const entries = value instanceof Map ? Object.entries(Object.fromEntries(value)) : Object.entries(value);
     const out: Record<string, unknown> = {};
     for (const [key, v] of entries) {
-      out[key] = REDACTED_KEYS.has(key.toLowerCase()) ? CENSOR : next(v);
+      out[key] = isRedactedKey(key) ? CENSOR : next(v);
     }
     return out;
   } finally {

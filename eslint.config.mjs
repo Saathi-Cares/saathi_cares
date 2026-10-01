@@ -38,6 +38,18 @@ export default defineConfig([
           ],
         },
       ],
+      // PLAN.md §8.9: redaction sees only the object payload, so a value interpolated into the message escapes it.
+      // Covers the message in both pino forms: log.info(`...`) and log.info({ ... }, `...`).
+      'no-restricted-syntax': [
+        'error',
+        ...[
+          'CallExpression[callee.property.name=/^(trace|debug|info|warn|error|fatal)$/] > TemplateLiteral.arguments:first-child[expressions.length>0]',
+          'CallExpression[callee.property.name=/^(trace|debug|info|warn|error|fatal)$/] > TemplateLiteral.arguments:nth-child(2)[expressions.length>0]',
+        ].map((selector) => ({
+          selector,
+          message: 'log the value as a field, never in the message text (PLAN.md §8.9)',
+        })),
+      ],
     },
   },
   {

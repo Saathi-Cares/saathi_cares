@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { REDACTED_KEYS, redactDeep } from './redaction';
+import { MAX_NODES, isRedactedKey, redactDeep } from './redaction';
+
+/** Objects and arrays in a redacted output: one per node the walk visited. */
+function countContainers(value: unknown): number {
+  if (value === null || typeof value !== 'object' || value instanceof Date) return 0;
+  return 1 + Object.values(value).reduce<number>((n, v) => n + countContainers(v), 0);
+}
 
 describe('redactDeep', () => {
   it('redacts sensitive keys at any depth, case-insensitively', () => {
@@ -17,10 +23,36 @@ describe('redactDeep', () => {
     expect(input.phone).toBe('1');
   });
 
-  it('handles cycles without throwing', () => {
-    const a: Record<string, unknown> = { name: 'x' };
-    a.self = a;
-    expect(() => redactDeep(a)).not.toThrow();
+  it('matches camelCase, kebab-case and header-style keys', () => {
+    expect(
+      redactDeep({
+        medicalHistory: 'a',
+        chiefComplaint: 'b',
+        phoneNumber: 'c',
+        accessToken: 'd',
+        apiKey: 'e',
+        'set-cookie': 'f',
+        'Set-Cookie': 'g',
+        Authorization: 'h',
+        'refresh-token': 'j',
+        emailAddress: 'k',
+        Mobile: 'l',
+        keep: 'm',
+      }),
+    ).toEqual({
+      medicalHistory: '[redacted]',
+      chiefComplaint: '[redacted]',
+      phoneNumber: '[redacted]',
+      accessToken: '[redacted]',
+      apiKey: '[redacted]',
+      'set-cookie': '[redacted]',
+      'Set-Cookie': '[redacted]',
+      Authorization: '[redacted]',
+      'refresh-token': '[redacted]',
+      emailAddress: '[redacted]',
+      Mobile: '[redacted]',
+      keep: 'm',
+    });
   });
 
   it('includes the PLAN.md §8.9 tier-2/3 field names', () => {
@@ -37,7 +69,7 @@ describe('redactDeep', () => {
       'mfa_secret',
       'vitals',
     ]) {
-      expect(REDACTED_KEYS.has(k)).toBe(true);
+      expect(isRedactedKey(k)).toBe(true);
     }
   });
 
@@ -101,20 +133,16 @@ describe('redactDeep', () => {
 
   it('truncates once the node budget is exhausted', () => {
     const wide = { items: Array.from({ length: 30_000 }, (_, i) => ({ i })) };
-    const start = performance.now();
     const out = redactDeep(wide);
-    const ms = performance.now() - start;
     expect(JSON.stringify(out)).toContain('"[truncated]"');
-    expect(ms).toBeLessThan(1000);
+    expect(countContainers(out)).toBe(MAX_NODES);
   });
 
   it('bounds an exponentially shared graph and leaks nothing', () => {
     let node: Record<string, unknown> = { phone: 'x' };
     for (let i = 0; i < 40; i++) node = { a: node, b: node };
-    const start = performance.now();
     const out = redactDeep(node);
-    const ms = performance.now() - start;
-    expect(ms).toBeLessThan(1000);
+    expect(countContainers(out)).toBeLessThanOrEqual(MAX_NODES);
     const json = JSON.stringify(out);
     expect(json).toContain('"[truncated]"');
     expect(json).not.toContain('"x"');

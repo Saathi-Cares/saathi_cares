@@ -22,7 +22,7 @@ describe('toErrorResponse', () => {
     expect(r.logLevel).toBe('error');
   });
 
-  it('marks retryable external errors with 503 and Retry-After semantics', () => {
+  it('maps a retryable external service error to 503 EXTERNAL_SERVICE_UNAVAILABLE', () => {
     const err = new ExternalServiceError('smtp', 'timeout', { retryable: true });
     const r = toErrorResponse(err, 'req-3');
     expect(err.retryable).toBe(true);
@@ -70,6 +70,20 @@ describe('fromPgError', () => {
     expect(check).toBeInstanceOf(ValidationError);
     expect(check?.message).toBe('Value not allowed');
     expect(check?.details?.[0]?.path).toBe('age_positive');
+  });
+
+  it('translates a serialization failure (40001) into a 409 ConflictError asking the client to retry', () => {
+    const mapped = fromPgError(Object.assign(new Error('could not serialize access'), { code: '40001' }));
+    expect(mapped).toBeInstanceOf(ConflictError);
+    expect(mapped?.httpStatus).toBe(409);
+    expect(mapped?.message).toBe('Concurrent update; retry the request');
+  });
+
+  it('translates a statement timeout (57014) into a retryable database ExternalServiceError', () => {
+    const pgErr = Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
+    const mapped = fromPgError(pgErr);
+    expect(mapped).toBeInstanceOf(ExternalServiceError);
+    expect(mapped).toMatchObject({ service: 'database', retryable: true, httpStatus: 503, cause: pgErr });
   });
 
   it('returns undefined for non-pg errors', () => {

@@ -12,7 +12,7 @@ async function main(): Promise<void> {
   console.error(applied.length ? `applied ${applied.length} migration(s)` : 'schema up to date');
 }
 
-main().catch((err: Error) => {
-  console.error(err.message);
+main().catch((err: unknown) => {
+  console.error(err instanceof Error ? err.message : String(err));
   process.exit(1);
 });

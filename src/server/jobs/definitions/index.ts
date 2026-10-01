@@ -1,4 +1,4 @@
-import type { JobDefinition } from '../boss';
+import type { JobDefinition } from '../define';
 import { systemNoop } from './system-noop';
 
 // why: JobDefinition<unknown> because the registry is heterogeneous; each definition validates its own data.

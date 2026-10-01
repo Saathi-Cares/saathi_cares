@@ -1,19 +1,33 @@
 export type ErrorDetail = { path: string; message: string };
 
+/** The PLAN.md §9.7 taxonomy: every code an error response can carry. */
+export type ErrorCode =
+  | 'VALIDATION_FAILED'
+  | 'UNAUTHENTICATED'
+  | 'MFA_REQUIRED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'INVALID_TRANSITION'
+  | 'RATE_LIMITED'
+  | 'EXTERNAL_SERVICE_UNAVAILABLE'
+  | 'EXTERNAL_SERVICE_FAILED'
+  | 'INTERNAL_ERROR';
+
 export type ErrorBody = {
-  error: { code: string; message: string; details?: ErrorDetail[]; request_id: string };
+  error: { code: ErrorCode; message: string; details?: ErrorDetail[]; request_id: string };
 };
 
 type AppErrorOptions = { details?: ErrorDetail[]; retryable?: boolean; cause?: unknown };
 
 export class AppError extends Error {
-  readonly code: string;
+  readonly code: ErrorCode;
   readonly httpStatus: number;
   readonly details: ErrorDetail[] | undefined;
   readonly retryable: boolean;
   override readonly cause: unknown;
 
-  constructor(code: string, httpStatus: number, message: string, opts: AppErrorOptions = {}) {
+  constructor(code: ErrorCode, httpStatus: number, message: string, opts: AppErrorOptions = {}) {
     super(message);
     this.name = new.target.name;
     this.code = code;
@@ -92,7 +106,7 @@ const PG_CHECK = '23514';
 const PG_SERIALIZATION = '40001';
 const PG_STATEMENT_TIMEOUT = '57014';
 
-type PgLikeError = Error & { code?: string; constraint?: string; column?: string };
+type PgLikeError = Error & { code?: string; constraint?: string };
 
 function constraintDetails(pg: PgLikeError, message: string): ErrorDetail[] | undefined {
   return pg.constraint ? [{ path: pg.constraint, message }] : undefined;

@@ -1,5 +1,6 @@
-import { Pool } from 'pg';
+import fs from 'node:fs/promises';
 import path from 'node:path';
+import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runMigrations } from './migrate';
 
@@ -7,7 +8,7 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is required for integration tests (see .env.test)');
 
 const pool = new Pool({ connectionString: url });
-const dir = path.resolve(__dirname, 'migrations');
+const dir = path.resolve(import.meta.dirname, 'migrations');
 
 beforeAll(async () => {
   await pool.query('drop table if exists schema_migrations');
@@ -29,14 +30,19 @@ describe('runMigrations', () => {
   });
 
   it('fails with a readable error and applies nothing when a file is broken', async () => {
-    const tmp = path.resolve(__dirname, '..', '..', '..', '.test-migrations');
-    const fs = await import('node:fs/promises');
-    await fs.mkdir(tmp, { recursive: true });
-    await fs.writeFile(path.join(tmp, '9999_broken.sql'), 'create table this is not sql;');
-    await expect(runMigrations({ connectionString: url, dir: tmp })).rejects.toThrow(/9999_broken\.sql/);
-    const rows = await pool.query("select 1 from schema_migrations where name = '9999_broken.sql'");
-    expect(rows.rowCount).toBe(0);
-    await fs.rm(tmp, { recursive: true, force: true });
+    const tmp = path.resolve(import.meta.dirname, '..', '..', '..', '.test-migrations');
+    try {
+      await fs.mkdir(tmp, { recursive: true });
+      await fs.writeFile(path.join(tmp, '9999_broken.sql'), 'create table this is not sql;');
+      const failure = runMigrations({ connectionString: url, dir: tmp });
+      await expect(failure).rejects.toThrow(/9999_broken\.sql/);
+      // The pg error is kept as the cause, with its code, for the log.
+      await expect(failure).rejects.toMatchObject({ cause: { code: '42601' } });
+      const rows = await pool.query("select 1 from schema_migrations where name = '9999_broken.sql'");
+      expect(rows.rowCount).toBe(0);
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
   });
 
   it('reports an unreachable database in one line', async () => {

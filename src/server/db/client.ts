@@ -16,6 +16,8 @@ export function getPool(): Pool {
       connectionString: cfg.databaseUrl,
       max: 10,
       idleTimeoutMillis: 30_000,
+      // why: pg waits forever for a connection by default, and statement_timeout only applies once connected.
+      connectionTimeoutMillis: 5_000,
       // PLAN.md §12.2: short statements, no idle transactions.
       statement_timeout: 15_000,
       idle_in_transaction_session_timeout: 10_000,

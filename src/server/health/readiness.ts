@@ -1,6 +1,7 @@
 import 'server-only';
 import { getConfig } from '../config';
 import { getPool } from '../db/client';
+import { jobsStarted as consumerStarted } from '../jobs/boss';
 import { getLogger } from '../observability/logger';
 import { getStorage } from '../storage';
 
@@ -15,11 +16,14 @@ type Deps = {
   jobsStarted?: () => boolean;
 };
 
+// why: a probe that hangs (a database host silently dropping packets) must still answer 503, not become part of the outage.
+export const CHECK_TIMEOUT_MS = 5_000;
+
 export async function checkReadiness(deps: Deps = {}): Promise<Readiness> {
   const cfg = getConfig();
   const pingDatabase = deps.pingDatabase ?? (async () => void (await getPool().query('select 1')));
   const probeStorage = deps.probeStorage ?? (() => getStorage().probeWritable());
-  const jobsStarted = deps.jobsStarted ?? (() => !cfg.jobsEnabled || jobsFlag.started);
+  const jobsStarted = deps.jobsStarted ?? (() => !cfg.jobsEnabled || consumerStarted());
 
   const [database, storage] = await Promise.all([
     outcomeOf('database', pingDatabase),
@@ -32,19 +36,20 @@ export async function checkReadiness(deps: Deps = {}): Promise<Readiness> {
 
 /** The endpoint is public (Nginx in 0B), so failure detail goes to the log, never the body. */
 async function outcomeOf(check: CheckName, fn: () => Promise<void>): Promise<'ok' | 'failed'> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`readiness check timed out after ${CHECK_TIMEOUT_MS} ms`)),
+      CHECK_TIMEOUT_MS,
+    );
+  });
   try {
-    await fn();
+    await Promise.race([fn(), timeout]);
     return 'ok';
   } catch (err) {
     getLogger().warn({ check, err }, 'readiness check failed');
     return 'failed';
+  } finally {
+    clearTimeout(timer);
   }
 }
-
-const processGlobal = globalThis as typeof globalThis & { __saathiJobsFlag?: { started: boolean } };
-
-/**
- * Set by the job consumer (Task 9) once pg-boss has started. Next bundles instrumentation.ts and the
- * route handlers as separate module graphs in one process, so the flag lives on globalThis to be shared.
- */
-export const jobsFlag = (processGlobal.__saathiJobsFlag ??= { started: false });

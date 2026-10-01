@@ -1,35 +1,27 @@
 import 'server-only';
 import { z } from 'zod';
 
-const booleanString = z
-  .enum(['true', 'false'])
-  .default('true')
-  .transform((v) => v === 'true');
+const trueOrFalse = z.enum(['true', 'false']).transform((v) => v === 'true');
 
-const schema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  APP_URL: z.url(),
-  DATABASE_URL: z.string().min(1),
-  // Owner connection used only by the migration runner; defaults to DATABASE_URL in dev/test.
-  DATABASE_URL_MIGRATIONS: z.string().min(1).optional(),
-  LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
-  MEDIA_ROOT: z.string().min(1),
-  MEDIA_SIGNING_SECRET: z.string().min(32),
-  JOBS_ENABLED: booleanString,
-  JOBS_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
-});
+// LOG_LEVEL is read by observability/logger.ts and DATABASE_URL_MIGRATIONS by db/migrate-cli.ts, not here:
+// both are needed before (or without) the app config.
+const schema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    DATABASE_URL: z.string().min(1),
+    MEDIA_ROOT: z.string().min(1),
+    JOBS_ENABLED: trueOrFalse.default(true),
+    JOBS_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
+  })
+  .transform((e) => ({
+    nodeEnv: e.NODE_ENV,
+    databaseUrl: e.DATABASE_URL,
+    mediaRoot: e.MEDIA_ROOT,
+    jobsEnabled: e.JOBS_ENABLED,
+    jobsConcurrency: e.JOBS_CONCURRENCY,
+  }));
 
-export type AppConfig = {
-  nodeEnv: 'development' | 'test' | 'production';
-  appUrl: string;
-  databaseUrl: string;
-  databaseUrlMigrations: string;
-  logLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-  mediaRoot: string;
-  mediaSigningSecret: string;
-  jobsEnabled: boolean;
-  jobsConcurrency: number;
-};
+export type AppConfig = z.infer<typeof schema>;
 
 export class ConfigError extends Error {
   constructor(problems: string[]) {
@@ -45,18 +37,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
     throw new ConfigError(problems);
   }
-  const e = parsed.data;
-  return {
-    nodeEnv: e.NODE_ENV,
-    appUrl: e.APP_URL,
-    databaseUrl: e.DATABASE_URL,
-    databaseUrlMigrations: e.DATABASE_URL_MIGRATIONS ?? e.DATABASE_URL,
-    logLevel: e.LOG_LEVEL,
-    mediaRoot: e.MEDIA_ROOT,
-    mediaSigningSecret: e.MEDIA_SIGNING_SECRET,
-    jobsEnabled: e.JOBS_ENABLED,
-    jobsConcurrency: e.JOBS_CONCURRENCY,
-  };
+  return parsed.data;
 }
 
 let cached: AppConfig | undefined;

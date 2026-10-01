@@ -35,8 +35,11 @@ export async function runMigrations(opts: Options): Promise<{ applied: string[] 
         await client.query('insert into schema_migrations (name) values ($1)', [file]);
         await client.query('commit');
       } catch (err) {
-        await client.query('rollback');
-        throw new Error(`Migration ${file} failed: ${(err as Error).message}`);
+        // A failed rollback is logged, never thrown: it must not replace the error that caused it.
+        await client
+          .query('rollback')
+          .catch((rollbackErr: unknown) => log(`rollback of ${file} failed: ${messageOf(rollbackErr)}`));
+        throw new Error(`Migration ${file} failed: ${messageOf(err)}`, { cause: err });
       }
       applied.push(file);
       log(`applied ${file}`);
@@ -46,4 +49,8 @@ export async function runMigrations(opts: Options): Promise<{ applied: string[] 
     await client.end();
   }
   return { applied };
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }

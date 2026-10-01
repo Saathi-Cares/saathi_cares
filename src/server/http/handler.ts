@@ -12,8 +12,6 @@ import {
 } from './errors';
 import { resolveRequestId } from './request-id';
 
-export type Permission = 'public'; // Phase 1 replaces this with PLAN.md §10.2 permission strings.
-
 export type HandlerContext<TBody, TQuery> = {
   requestId: string;
   body: TBody;
@@ -28,7 +26,6 @@ export type HandlerContext<TBody, TQuery> = {
 export type HandlerResult = { status?: number; data: unknown } | Response;
 
 type Spec<TBody, TQuery> = {
-  permission: Permission;
   body?: ZodType<TBody>;
   query?: ZodType<TQuery>;
   transactional?: boolean;
@@ -49,6 +46,7 @@ export function withHandler<TBody = undefined, TQuery = undefined>(
       const log = getLogger();
       const started = Date.now();
       try {
+        // why: no authorisation happens here yet; Phase 1 adds the PLAN.md §10.2 permission check at this seam.
         const params = await routeCtx.params;
         const body = await parseBody(request, spec.body);
         const query = parseQuery(request, spec.query);
