@@ -12,6 +12,8 @@ rev 5.4 (2026-10-02): §8.10 data structure strategy by activity and §8.5.12 em
 
 rev 5.5 (2026-10-02): the host-dependent Phase 0 exit criteria moved to a new Phase 1D (first deployment) so Phase 0 closes cleanly; §8.11 in-process data structures and complexity budget added.
 
+rev 5.6 (2026-10-02): nightly vulnerability scan is stored and blocking for fixable CRITICAL findings (§11, §16.2); first CI run on GitHub fixed (typecheck generates Next types; example secrets in plan documents replaced).
+
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
@@ -1317,7 +1319,7 @@ lint (eslint incl. the one boundary rule) → typecheck (tsc --noEmit)
 → build (next build) → smoke e2e (Playwright, 4 flows: login+MFA, register patient, dentist review, CMS publish)
 ```
 
-Target under 8 minutes. `nightly.yml` runs the full Playwright suite, `npm audit --audit-level=high`, Trivy on the latest image (failing on a CRITICAL with a fix available), and dependency review.
+Target under 8 minutes. `nightly.yml` runs the full Playwright suite, `npm audit --audit-level=high`, Trivy on the latest image (report kept 90 days as a workflow artifact; the job fails on a CRITICAL with a fix available; Slack notice when the webhook secret exists). Dependency review runs in `ci.yml` on pull requests, not nightly.
 
 ### 16.3 `deploy.yml`
 
