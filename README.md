@@ -119,6 +119,5 @@ What the scripts do once Task 8 has installed them on a VPS (none of this runs t
 Vulnerability scanning runs on GitHub, not on the VPS: `.github/workflows/nightly.yml` builds the image every night
 (03:00 IST) and scans it with Trivy. The full HIGH and CRITICAL report is the artifact `trivy-report` on the run
 (Actions → nightly → the run → Artifacts; kept 90 days) and is printed as a table in the job log. The job fails on a
-CRITICAL vulnerability that has a fix available, and on `npm audit --audit-level=high`; GitHub's failed-workflow email
-then reaches the owner. When the repository secret `SLACK_WEBHOOK_URL` is set, the last step posts `[OK]` or `[ALERT]`
+CRITICAL vulnerability that has a fix available, and on `npm audit --audit-level=high`; GitHub then emails the user who last changed the `cron` line in `nightly.yml`. When the repository secret `SLACK_WEBHOOK_URL` is set, the last step posts `[OK]` or `[ALERT]`
 with the job result and the CRITICAL/HIGH counts to Slack. Details: `docs/runbooks/deploy-and-rollback.md`.

@@ -25,7 +25,7 @@ Phase 0 is to be closed on the repository side now, without claiming the deploym
 `PLAN.md` §18 Phase 0 had two sets of exit criteria from rev 5.2. In rev 5.5 the deployment set moved to its own milestone, §18 Phase 1D (first deployment); the repository set stays in Phase 0 (lines 1371–1378), with a pointer to Phase 1D at line 1380:
 
 - **(a) Repository criteria.** These close Phase 0 on the repository. They are all met; the evidence is below.
-- **(b) Deployment criteria.** These now live in `PLAN.md` §18 Phase 1D (lines 1399–1404) and are executed as **Phase 1D (first deployment)** when the owner chooses hosting. They follow `docs/runbooks/host-setup.md` and 0B Task 8, and they must be complete before any real patient data is entered, which first happens at the first live camp in Phase 2 (`PLAN.md:1425`).
+- **(b) Deployment criteria.** These now live in `PLAN.md` §18 Phase 1D (lines 1399–1404) and are executed as **Phase 1D (first deployment)** when the owner chooses hosting. They follow `docs/runbooks/host-setup.md` and 0B Task 8, and they must be complete before any real patient data is entered, which first happens at the first live camp in Phase 2 (`PLAN.md:1427`).
 
 No design decision changed.
 
@@ -79,7 +79,7 @@ No design decision changed.
 | A restore test has passed on the host, and the mirror exists on the developer's machine | deferred, needs a host | `host-setup.md` §9 (line 296; restore test by hand at line 303, mirror at line 323); 0B Task 8 Step 5. A local restore test passed earlier (`final-review.md:145`). |
 | Every §14.4 alert triggered once and seen in the alert channel | deferred, needs a host and Slack | `host-setup.md` §12 (line 392); 0B Task 8 Step 4. See open point 1 below. |
 
-These scope items also need the host and are done in Phase 1D (first deployment) (`PLAN.md:1406`):
+These scope items also need the host and are done in Phase 1D (first deployment) (`PLAN.md:1408`):
 
 - the host-setup runbook executed
 - the hosted uptime monitor (`host-setup.md` §10, line 364; vendor not chosen, `0B ledger:73`)
@@ -89,8 +89,8 @@ These scope items also need the host and are done in Phase 1D (first deployment)
 
 ### Open points on (b), for the owner
 
-1. **Three §14.4 alerts cannot be raised in Phase 0, even with a host.** The login-failure burst and the patient-search rate-limit trips wait on Phase 1. Webhook signature failures wait on Phase 7 (`infra/checks/README.md:46-50`). Runbook step 12 limits itself to the alerts "that the code can raise today" (`host-setup.md:394`). The criterion as worded in `PLAN.md:1404` therefore needs that same qualification when Phase 1D (first deployment) is run. This ADR does not change the criterion.
-2. **Phase close without a staging demo or a tagged release.** §18 says each phase "ends with a demo on staging, the exit criteria checked, a tagged release" (`PLAN.md:1358`). Staging runs on the host (`PLAN.md:1288`), so Phase 0 closes on the repository without a staging demo or a tag. Phases 1–3 will meet the same constraint until hosting is chosen (`PLAN.md:1262`).
+1. **Three §14.4 alerts cannot be raised in Phase 0, even with a host.** The login-failure burst and the patient-search rate-limit trips wait on Phase 1. Webhook signature failures wait on Phase 7 (`infra/checks/README.md:46-50`). Runbook step 12 limits itself to the alerts "that the code can raise today" (`host-setup.md:394`). The criterion as worded in `PLAN.md:1406` therefore needs that same qualification when Phase 1D (first deployment) is run. This ADR does not change the criterion.
+2. **Phase close without a staging demo or a tagged release.** §18 says each phase "ends with a demo on staging, the exit criteria checked, a tagged release" (`PLAN.md:1360`). Staging runs on the host (`PLAN.md:1290`), so Phase 0 closes on the repository without a staging demo or a tag. Phases 1–3 will meet the same constraint until hosting is chosen (`PLAN.md:1264`).
 
 ## What deviated from the plan and why
 
@@ -103,7 +103,7 @@ Accepted departures and rulings, from the ledgers:
   - `findJobs` is used instead of `getQueueSize`, which is absent in pg-boss 12.
   - `NEXT_MANUAL_SIG_HANDLE=true` is set in the image.
   - (`0A ledger:97`)
-- **Lighthouse.** framer-motion was removed from the public pages. Performance below 90 on bare `next start` was accepted for 0A and was to be re-measured behind Nginx and Cloudflare at Phase 0 exit (`0A ledger:102,105`). That re-measurement needs the host and has not happened. Note that `PLAN.md` puts "Lighthouse performance ≥ 90" in the **Phase 4** exit criteria (`PLAN.md:1460`), not Phase 0, although the 0A plan says "PLAN.md Phase 0 exit wants performance ≥ 90" (`docs/superpowers/plans/2026-09-29-phase0a-app-foundation.md:2270`). The 0A plan's statement is not supported by `PLAN.md`.
+- **Lighthouse.** framer-motion was removed from the public pages. Performance below 90 on bare `next start` was accepted for 0A and was to be re-measured behind Nginx and Cloudflare at Phase 0 exit (`0A ledger:102,105`). That re-measurement needs the host and has not happened. Note that `PLAN.md` puts "Lighthouse performance ≥ 90" in the **Phase 4** exit criteria (`PLAN.md:1462`), not Phase 0, although the 0A plan says "PLAN.md Phase 0 exit wants performance ≥ 90" (`docs/superpowers/plans/2026-09-29-phase0a-app-foundation.md:2270`). The 0A plan's statement is not supported by `PLAN.md`.
 - **Two tooling rulings:**
   - `test:int` uses a positional vitest filter (`0A ledger:14`).
   - `vitest.setup.ts` loads `.env.test` then `.env.test.local` and never `.env` (`0A ledger:68`).
@@ -120,7 +120,7 @@ Accepted departures and rulings, from the ledgers:
 - **Slack is the only alert channel in Phase 0.** The §14.2 email channel is parked until Phase 1 (`0B ledger:71`). The daily digest reported current state only (`0B ledger:72`); it now also lists the state changes of the last 24 h (H9 under "Closed holes").
 - **The mirror script requires the VPS host.** The deploy state is written only on success (`0B ledger:73`).
 - **Deploy ordering:** migrate first, then `app` alone, a health wait, then the rest. The backup container stays off the internet and reports through state files (`0B ledger:78`).
-- **The restore test is simplified** (`0B ledger:80`, departure M5). It restores into a scratch database inside the production Postgres instance and checks no referential integrity beyond what `pg_restore` enforces. `PLAN.md` §15.5 now states this (rev 5.3, `PLAN.md:1297`; H11 under "Closed holes").
+- **The restore test is simplified** (`0B ledger:80`, departure M5). It restores into a scratch database inside the production Postgres instance and checks no referential integrity beyond what `pg_restore` enforces. `PLAN.md` §15.5 now states this (rev 5.3, `PLAN.md:1299`; H11 under "Closed holes").
 - **Owner decisions of 2026-10-01** (`0B ledger:86`):
   - hostnames `staging.saathicares.org` and `saathicares.org`
   - CERT-In log retention in Phase 7
@@ -129,7 +129,7 @@ Accepted departures and rulings, from the ledgers:
 
 ## Lighthouse (re-run 2026-10-02)
 
-Round 1, one mobile run against `npm run start` on the developer's machine: `npx -y lighthouse http://localhost:3000 --only-categories=performance,seo,accessibility,best-practices --chrome-flags="--headless=new" --output=json` (Lighthouse 13.5.0, form factor `mobile`, fetch time `2026-10-02T11:25:53.202Z`). Scores: performance 93, accessibility 96, best practices 100, SEO 100. The run before that scored 88 / 96 / 100 / 100 (`.superpowers/sdd/audit-fix/wave-b-report.md:9`), earlier runs 84–87 / 96 / 100 / 100. The site was not behind Nginx compression or Cloudflare, and one localhost run is not the Phase 4 measurement (`PLAN.md:1460`).
+Round 1, one mobile run against `npm run start` on the developer's machine: `npx -y lighthouse http://localhost:3000 --only-categories=performance,seo,accessibility,best-practices --chrome-flags="--headless=new" --output=json` (Lighthouse 13.5.0, form factor `mobile`, fetch time `2026-10-02T11:25:53.202Z`). Scores: performance 93, accessibility 96, best practices 100, SEO 100. The run before that scored 88 / 96 / 100 / 100 (`.superpowers/sdd/audit-fix/wave-b-report.md:9`), earlier runs 84–87 / 96 / 100 / 100. The site was not behind Nginx compression or Cloudflare, and one localhost run is not the Phase 4 measurement (`PLAN.md:1462`).
 
 Accessibility was 96 in round 1 because `color-contrast` still failed on muted text: `text-muted-foreground` (`#627884`) on the tinted section and card backgrounds at 3.93–4.46:1, and `text-muted-foreground/80` (`Team.tsx:38`) at 3.13:1. Round 2 fixed those (H12, H13).
 
@@ -149,7 +149,7 @@ The owner ruled on 2026-10-02 that Phase 0 closes with no documented-but-unfixed
 - **H8. Staging guard.** `scripts/deploy-remote.sh:37-43` adds `same_dir` (string after trimming, or `realpath -m`), used at `:89-91`. Run in `alpine:3.20` with GNU coreutils and a fake `/srv/saathi`, `DATA_ROOT=/data/prod` in `.env.prod` and `/srv/alias` a symlink to `/srv/saathi`. Before: `''` refused; `/srv/saathi/../saathi`, `/srv//saathi/`, `/srv/alias`, `/data//prod/`, `/data/x/../prod` passed the guard (stopped later at `cd: /srv/saathi/repo`). After: all six refused; `/srv/saathi-staging` passes.
 - **H9. Digest covers the last 24 h.** `infra/checks/check.sh:35-41` appends `epoch check from to message` to `$STATE/transitions.log` on every state change; the digest (`:162-190`) trims the log to 30 days and lists the last 24 h newest first, at most 20, or `no state changes in 24 h`. Harness section 11 (`check.test.sh:144-161`): fail→ok cycle listed, newest first, 2-day-old line left out, 31-day-old line trimmed, empty-history wording. 33 `ok`, `check.sh tests passed`. With `tac` and the 24 h filter removed, `digest order` and `digest lists a 2-day-old state change` fail. `infra/checks/README.md:64-65` updated.
 - **H10. DR scenario B.** `docs/runbooks/disaster-recovery.md:182` adds `ls /backups/restore/backups/dumps/` before `pg_restore`, as A2 has (`:102`). B keeps `latest` and says why (`:192-194`): no backup of a damaged state was taken after a VPS loss, so the mirror's newest snapshot is the one; after damage it restores by id as in A2.
-- **H11. PLAN.md §15.5.** `PLAN.md:1297` now states that the monthly restore test restores into a scratch database inside the production Postgres instance (`infra/backup/restore-test.sh`), why, and that it checks `schema_migrations` and up to three public media hashes; header line `PLAN.md:9` "rev 5.3 (2026-10-02): restore-test wording matches `infra/backup/restore-test.sh`; digest history added." The script's comment (`restore-test.sh:16`) now points at §15.5 instead of calling it a departure.
+- **H11. PLAN.md §15.5.** `PLAN.md:1299` now states that the monthly restore test restores into a scratch database inside the production Postgres instance (`infra/backup/restore-test.sh`), why, and that it checks `schema_migrations` and up to three public media hashes; header line `PLAN.md:9` "rev 5.3 (2026-10-02): restore-test wording matches `infra/backup/restore-test.sh`; digest history added." The script's comment (`restore-test.sh:16`) now points at §15.5 instead of calling it a departure.
 
 Round 2 (owner ruling 2026-10-02: fix the contrast findings instead of documenting them; keep the hues, meet WCAG AA). Contrast from a Node script that reads the tokens in `app/globals.css` and applies the WCAG 2.x formula:
 
@@ -159,7 +159,7 @@ Round 2 (owner ruling 2026-10-02: fix the contrast findings instead of documenti
 
 ## Memory budget
 
-Not measurable until deployed. 0B Task 8 Step 6 asks for `docker stats` after 24 h on the host. `PLAN.md:1277` budgets about 2.6 GB resident with `core` only, including the OS. The `mem_limit` values in `infra/compose.yaml` (lines 30, 51, 74, 97, 124: 1536m, 256m, 768m, 64m, 128m) are limits, not measurements.
+Not measurable until deployed. 0B Task 8 Step 6 asks for `docker stats` after 24 h on the host. `PLAN.md:1279` budgets about 2.6 GB resident with `core` only, including the OS. The `mem_limit` values in `infra/compose.yaml` (lines 30, 51, 74, 97, 124: 1536m, 256m, 768m, 64m, 128m) are limits, not measurements.
 
 ## Test sensitivity (mutation check, re-run 2026-10-02 after the test-gap fixes)
 
@@ -200,7 +200,7 @@ Remaining. Neither is caught, and both are equivalent mutants.
 
 ## Consequences
 
-- Phase 0 is closed on the repository. Phase 1 development can start on the developer's machine. Nothing in Phase 1–3 *development* needs the host (`PLAN.md:1262`).
-- Before the first real patient data (the first live camp, Phase 2, `PLAN.md:1425`), the deployment criteria (b), now Phase 1D (first deployment), must be met and recorded. That means appending their evidence to this ADR or writing a follow-up ADR, with the alert table from `host-setup.md` §12, the deploy and rollback timings, and `docker stats` after 24 h.
+- Phase 0 is closed on the repository. Phase 1 development can start on the developer's machine. Nothing in Phase 1–3 *development* needs the host (`PLAN.md:1264`).
+- Before the first real patient data (the first live camp, Phase 2, `PLAN.md:1427`), the deployment criteria (b), now Phase 1D (first deployment), must be met and recorded. That means appending their evidence to this ADR or writing a follow-up ADR, with the alert table from `host-setup.md` §12, the deploy and rollback timings, and `docker stats` after 24 h.
 - The test gaps found by the mutation check are closed, except the two equivalent mutants (M6b, M8b) explained above.
 - The organisation name, domain and contact details remain provisional (`CLAUDE.md:9`).
