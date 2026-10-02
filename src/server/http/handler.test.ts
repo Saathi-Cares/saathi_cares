@@ -128,6 +128,18 @@ describe('withHandler', () => {
     expect(res.headers.get('x-request-id')).toBe('client-id-2');
   });
 
+  it('adds x-request-id to a returned Response whose headers are immutable (Response.redirect)', async () => {
+    const handler = withHandler({}, async () => Response.redirect('https://example.org/', 302));
+    const res = await handler(
+      new Request('http://t/x', { headers: { 'x-request-id': 'client-id-3' } }),
+      routeCtx,
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('https://example.org/');
+    expect(res.headers.get('x-request-id')).toBe('client-id-3');
+    expect(parsedLogLines()[0]?.msg).toBe('request');
+  });
+
   it('maps a pg unique violation thrown from fn to 409 naming the constraint only in details', async () => {
     const handler = withHandler({}, async () => {
       throw Object.assign(new Error('duplicate key value violates unique constraint'), {

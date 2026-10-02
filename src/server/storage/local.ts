@@ -7,8 +7,10 @@ import { pipeline } from 'node:stream/promises';
 import { ExternalServiceError, NotFoundError, ValidationError } from '../http/errors';
 import type { PutResult, StorageAdapter } from './adapter';
 
-// Every segment starts with a letter or digit, so `.` and `..` segments cannot occur.
-const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*(\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
+// Every segment starts with a letter or digit, so `.` and `..` segments cannot occur, and no segment's base name
+// (case-insensitive, before any extension) is a Windows reserved device name such as `con` or `nul.txt`.
+const SEGMENT = String.raw`(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|/|$))[A-Za-z0-9][A-Za-z0-9._-]*`;
+const KEY_PATTERN = new RegExp(String.raw`^${SEGMENT}(\/${SEGMENT})*$`, 'i');
 
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(private readonly root: string) {}

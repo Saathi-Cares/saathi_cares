@@ -75,8 +75,10 @@ docs/runbooks/  host setup, deploy and rollback, disaster recovery, breach respo
 ## Known limitations
 
 - No admin, no login, no forms.
-- Mobile Lighthouse performance measured 84–87 on a bare `next start`. The ≥ 90 target is re-measured behind Nginx and Cloudflare at Phase 0 exit.
-- The coral Donate button's text contrast is 3.57:1, below 4.5:1. The brand decision is pending.
+- Mobile Lighthouse performance on a bare `next start` (no compression, no CDN) measured 84–88 in earlier runs and 93 in one run on 2026-10-02; the ≥ 90 target is a Phase 4 exit criterion and is re-measured on the host.
+- The coral accent (`--accent`, `--coral-500`, `--coral-600` in `app/globals.css`) is a placeholder until the organisation supplies its palette (information-request workbook R04). `--accent` was darkened to 12 70% 42% so the Donate and call-to-action button text measures 5.46:1 (4.61:1 on the header button's /90 hover).
+- The hero headline's coral highlight (`text-coral-500` in `src/components/sections/Hero.tsx`) measures 1.75:1 against `--primary`, the colour of the overlay on the hero photo; large text needs 3:1, which this hue reaches only at about 75% lightness. Pending the palette decision above.
+- Lighthouse (mobile, 2026-10-02) still fails `color-contrast` for `text-muted-foreground` (`--muted-foreground`, 200 15% 45%) on the tinted section and card backgrounds, 3.93:1 to 4.46:1, and for the team credentials line (`text-muted-foreground/80`, `src/components/sections/Team.tsx:38`) at 3.13:1; normal text needs 4.5:1. Pending the same palette decision.
 - Contact details (email, address, team LinkedIn URLs) carried over from the prototype; pending confirmation by the organisation.
 - The population and prevalence statistics in the home page's "What Are We Solving?" section have no cited source yet; they stay until the owner supplies the sources.
 

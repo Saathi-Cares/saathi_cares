@@ -53,6 +53,19 @@ describe('LocalStorageAdapter', () => {
     expect(await fs.readdir(root)).toEqual([]);
   });
 
+  it('rejects Windows reserved device names in any segment, with or without an extension', async () => {
+    for (const bad of ['con', 'nul.txt', 'a/COM1/b', 'private/Lpt9', 'aux.tar.gz', 'PRN/x']) {
+      await expect(storage.exists(bad)).rejects.toBeInstanceOf(ValidationError);
+    }
+  });
+
+  it('accepts names that only start like a reserved device name', async () => {
+    for (const good of ['private/console.txt', 'private/con-1', 'private/com10', 'private/nulls.txt']) {
+      await storage.put(good, Buffer.from('x'));
+      expect(await storage.exists(good)).toBe(true);
+    }
+  });
+
   it('accepts dots inside a segment', async () => {
     await storage.put('private/x..jpg', Buffer.from('x'));
     expect(await storage.exists('private/x..jpg')).toBe(true);

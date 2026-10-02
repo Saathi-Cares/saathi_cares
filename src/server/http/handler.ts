@@ -54,9 +54,11 @@ export function withHandler<TBody = undefined, TQuery = undefined>(
         const transactional = spec.transactional ?? MUTATING.has(request.method);
         const run = (tx: Tx | undefined) => fn({ requestId, body, query, params, db, tx, log, request });
         const result = transactional ? await db.transaction((tx) => run(tx)) : await run(undefined);
+        // why: a returned Response may have immutable headers (Response.redirect, a fetch result) and headers.set
+        // would throw; always copying is one branch instead of a try/catch, and the copy shares the body stream.
         const response =
           result instanceof Response
-            ? result
+            ? new Response(result.body, result)
             : Response.json({ data: result.data }, { status: result.status ?? 200 });
         response.headers.set('x-request-id', requestId);
         log.info(

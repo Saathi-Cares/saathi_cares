@@ -61,7 +61,8 @@ Raised elsewhere: site down and edge-certificate expiry (hosted uptime monitor);
 
 - State lives in `/srv/saathi/checks/state/<state name>`, containing `ok`, `fail` (alerted), or `muted` (failing, first seen while muted, not alerted yet). Delete a file to reset that check.
 - Silence a check for 24 hours: `touch /srv/saathi/checks/state/<state name>.mute`. A muted check posts nothing. A muted failing check does not hold back the heartbeat, so a mute does not page through the uptime monitor instead. The mute stops working 24 h after the file's last modification (`touch` it again to extend, delete it to end early); a check still failing then alerts on the next run.
-- `check.sh --digest` (cron, 08:00) runs the checks, then posts one `[DIGEST]` message with every check's current state and any active mutes. It shows the state now, not a history of the last 24 h.
+- Every state change (`ok`, `fail`, `muted`, in any direction) appends one line `<epoch> <check> <from> <to> <message>` to `/srv/saathi/checks/state/transitions.log`.
+- `check.sh --digest` (cron, 08:00) runs the checks, then posts one `[DIGEST]` message with every check's current state, any active mutes, and the state changes of the last 24 h from `transitions.log` (count, then the lines newest first as `<time> <check> <from>-><to>: <message>`, at most 20), or `no state changes in 24 h`. Each digest run trims `transitions.log` to its last 30 days.
 - Runs are serialised with `flock` on `/srv/saathi/checks/state.lock`, so the 08:00 digest run waits for the 5-minute run, for at most 240 s (`flock -w 240`); if the lock is still held then, the run logs `another check.sh run holds ...; skipped` and exits.
 - Output goes to `/srv/saathi/checks/check.log`: one `fail:` line per failing check and a `checks done, failures=N` line per run.
 

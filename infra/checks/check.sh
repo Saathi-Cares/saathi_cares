@@ -32,22 +32,29 @@ notify() { slack_post "${SLACK_WEBHOOK_URL:-}" "[$1] $2: $3 ($(hostname))"; } # 
 is_muted() { # a <check>.mute file younger than 24 h silences that check
   [ -f "$STATE/$1.mute" ] && [ -n "$(find "$STATE/$1.mute" -mmin -1440 2>/dev/null)" ]
 }
+TRANSITIONS=$STATE/transitions.log
+# Stores a check's state; a change (ok, fail, muted in any direction) appends "epoch check from to message" to
+# $TRANSITIONS, which the daily digest reads back. check, previous state, new state, message.
+set_state() {
+  echo "$3" > "$STATE/$1"
+  [ "$2" = "$3" ] || printf '%s %s %s %s %s\n' "$now" "$1" "$2" "$3" "$(printf '%s' "$4" | tr '\n' ' ')" >> "$TRANSITIONS"
+}
 report() { # check, ok(0/1), message — alert on state change only
   local check=$1 ok=$2 msg=$3 prev
   prev=$(cat "$STATE/$check" 2>/dev/null || echo ok)
   if [ "$ok" -ne 0 ]; then
     # A failure seen only while muted is stored as "muted", not "fail", so it still alerts once the mute expires.
     if is_muted "$check"; then
-      [ "$prev" = fail ] || echo "muted" > "$STATE/$check"
+      [ "$prev" = fail ] || set_state "$check" "$prev" muted "$msg"
       echo "muted fail: $check: $msg"
       return 0
     fi
     failures=$((failures + 1))
     echo "fail: $check: $msg"
     [ "$prev" != fail ] && notify ALERT "$check" "$msg"
-    echo "fail" > "$STATE/$check"
+    set_state "$check" "$prev" fail "$msg"
   else
-    echo "ok" > "$STATE/$check"
+    set_state "$check" "$prev" ok "$msg"
     [ "$prev" = fail ] && ! is_muted "$check" && notify RECOVERED "$check" "$msg"
   fi
   return 0
@@ -152,7 +159,8 @@ fi
 # heartbeat only when every unmuted check passed (dead-man switch at the uptime monitor)
 if [ "$failures" -eq 0 ] && [ -n "${UPTIME_HEARTBEAT_URL:-}" ]; then curl -s -m 10 "$UPTIME_HEARTBEAT_URL" >/dev/null || true; fi
 
-# daily digest: one message with every check's current state, muted checks named
+# daily digest: one message with every check's current state, muted checks named, and the state changes of the last
+# 24 h from $TRANSITIONS (newest first, at most 20). The log is trimmed to the last 30 days here.
 if [ "${1:-}" = "--digest" ]; then
   summary="" muted=""
   for f in "$STATE"/*; do
@@ -160,9 +168,25 @@ if [ "${1:-}" = "--digest" ]; then
     name=$(basename "$f")
     case "$name" in
       *.mute) is_muted "${name%.mute}" && muted="$muted ${name%.mute}" ;;
+      transitions.log) ;;
       *) summary="$summary$name=$(cat "$f") " ;;
     esac
   done
-  notify DIGEST all "${summary% }${muted:+ | muted:$muted}"
+  if [ -f "$TRANSITIONS" ]; then
+    awk -v since=$((now - 30 * 86400)) '$1 >= since' "$TRANSITIONS" > "$TRANSITIONS.tmp" && mv "$TRANSITIONS.tmp" "$TRANSITIONS"
+  fi
+  recent=$(awk -v since=$((now - 86400)) '$1 >= since' "$TRANSITIONS" 2>/dev/null | tac)
+  n=$(printf '%s' "$recent" | grep -c . || true)
+  if [ "$n" -eq 0 ]; then
+    history="no state changes in 24 h"
+  else
+    history="$n state change(s) in 24 h"
+    [ "$n" -gt 20 ] && history="$history, newest 20 shown"
+    history="$history:"
+    while read -r ts check from to msg; do
+      history="$history"$'\n'"$(date -d "@$ts" -Is 2>/dev/null || echo "$ts") $check $from->$to: $msg"
+    done < <(printf '%s\n' "$recent" | head -n 20)
+  fi
+  notify DIGEST all "${summary% }${muted:+ | muted:$muted}"$'\n'"$history"
 fi
 echo "$(date -Is) checks done, failures=$failures"

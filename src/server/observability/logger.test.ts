@@ -16,6 +16,20 @@ describe('createLogger', () => {
     expect(parsed.patient.phone).toBe('[redacted]');
     expect(typeof parsed.time).toBe('number');
   });
+
+  it('writes an Error field with its class as type and name, its message and stack, and redacted own properties', async () => {
+    const { lines, log } = await createCapturingLogger();
+    const err = Object.assign(new RangeError('x'), { code: 'E_RANGE', password: 'hunter2' });
+    log.error({ err }, 'm');
+    const parsed = JSON.parse(lines[0] ?? '{}');
+    expect(parsed.err.type).toBe('RangeError');
+    expect(parsed.err.name).toBe('RangeError');
+    expect(parsed.err.message).toBe('x');
+    expect(typeof parsed.err.stack).toBe('string');
+    expect(parsed.err.code).toBe('E_RANGE');
+    expect(parsed.err.password).toBe('[redacted]');
+    expect(lines[0]).not.toContain('hunter2');
+  });
 });
 
 describe('createRootLogger', () => {

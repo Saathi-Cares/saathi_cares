@@ -6,6 +6,8 @@ rev 5.1 (2026-10-01): wording aligned with the Phase 0B code (§11, §14.1, §15
 
 rev 5.2 (2026-10-02): Phase 0 exit criteria split into repository and deployment criteria; hosting deferred; names provisional.
 
+rev 5.3 (2026-10-02): restore-test wording matches `infra/backup/restore-test.sh`; digest history added.
+
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
@@ -1228,7 +1230,7 @@ Config is env-only (`src/server/config.ts`, zod-validated). `.env.example` is th
 
 - **Every 6 hours** the `backup` container runs `pg_dump -Fc` and snapshots the media directory into a restic repository (encrypted, deduplicated) on the attached volume. Retention: 28 six-hourly, 30 daily, 12 weekly, 12 monthly. This protects against application bugs, bad migrations and database corruption with an RPO of **6 h**.
 - **Developer-machine mirror.** A scheduled task on the developer's machine runs `restic copy` from the VPS whenever the machine is online (typically daily); check.sh alerts if the mirror is older than 3 days. This is the only protection against loss of the VPS itself, so the effective RPO for that case is the age of the last mirror. Accepted risk (D24); a backup host or a cheap object-storage bucket replaces the mirror in one day when the organisation is ready.
-- **Monthly restore test on the VPS** (not on GitHub runners, so no PHI or keys leave our machines): restore the newest dump into a throwaway Postgres container, run row-count and referential-integrity checks, restore a sample of media files and verify hashes, post the result to the alert channel. A restore that has not been tested is not a backup; check.sh alerts if the last test is older than 35 days. The developer runs the same script against the mirror once a quarter.
+- **Monthly restore test on the VPS** (not on GitHub runners, so no PHI or keys leave our machines): restore the newest dump into a scratch database inside the production Postgres instance, dropped afterwards (`infra/backup/restore-test.sh`; a throwaway Postgres container would need the Docker socket inside the backup container or a second host cron job, and a second Postgres in memory on a 4 GB host), check that `schema_migrations` has rows (row-count and referential-integrity checks over the clinical tables are added with those tables, from Phase 1), restore up to three public media files and compare their hashes with the live copies, post the result to the alert channel. A restore that has not been tested is not a backup; check.sh alerts if the last test is older than 35 days. The developer runs the same script against the mirror once a quarter.
 - **Keys.** The restic passphrase, the application encryption key and the super-admin recovery codes are held by the developer; a printed, sealed copy goes to the organisation's founder with the one-page recovery instructions from `docs/runbooks/disaster-recovery.md` (D24).
 - **Targets:** RPO 6 h for corruption, mirror age for VPS loss; **RTO 4 h** via the runbook (new VPS → compose up → restic restore from the mirror → DNS switch), rehearsed once before the first real patient record exists (Phase 0 exit criterion) and again before public launch (Phase 7).
 

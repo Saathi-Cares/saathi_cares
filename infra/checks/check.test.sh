@@ -141,4 +141,23 @@ run --digest
 [ "$(count '\[DIGEST\]')" = 1 ] && has 'muted: db_up' && ok "digest posted during a mute and names it" || bad "digest during mute: $(cat "$tmp/curl.log")"
 rm -f "$tmp/state/db_up.mute"
 
+# 11. digest history: a fail->ok cycle of the last 24 h is listed newest first; a 2-day-old line is not; the log is
+#     trimmed to 30 days; with no changes in 24 h the digest says so
+tl="$tmp/state/transitions.log"
+{ echo "$((now - 31 * 86400)) zz_ancient ok fail thirty-one days ago"; echo "$((now - 2 * 86400)) zz_old ok fail two days ago"; cat "$tl"; } > "$tl.new"
+mv "$tl.new" "$tl"
+echo $((now - 30000)) > "$st/last-backup-ok"
+run
+echo "$now" > "$st/last-backup-ok"
+run
+run --digest
+has 'backup_age ok->fail: last backup is' && has 'backup_age fail->ok: last backup age' && ok "digest lists the fail->ok cycle" || bad "digest history: $(cat "$tmp/curl.log")"
+[ "$(grep -o 'backup_age [a-z]*->[a-z]*' "$tmp/curl.log" | head -n 2 | tr '\n' ' ')" = 'backup_age fail->ok backup_age ok->fail ' ] && ok "digest history is newest first" || bad "digest order: $(grep -o 'backup_age [a-z]*->[a-z]*' "$tmp/curl.log" | tr '\n' ' ')"
+has 'zz_old' && bad "digest lists a 2-day-old state change" || ok "digest leaves out changes older than 24 h"
+has 'transitions.log=' && bad "digest lists the transitions log as a check" || ok "transitions log is not a check"
+grep -q zz_old "$tl" && ! grep -q zz_ancient "$tl" && ok "digest trims the log to 30 days" || bad "log after trim: $(cat "$tl")"
+mv "$tl" "$tl.saved"
+run --digest
+has 'no state changes in 24 h' && ok "digest says when nothing changed in 24 h" || bad "empty history: $(cat "$tmp/curl.log")"
+
 [ "$fails" -eq 0 ] && echo "check.sh tests passed" || { echo "$fails assertion(s) failed"; exit 1; }

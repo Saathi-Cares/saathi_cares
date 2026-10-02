@@ -34,6 +34,14 @@ trim_slash() {
   printf '%s' "$p"
 }
 
+# usage: same_dir <a> <b>. True when both are non-empty and name the same directory: equal after trimming trailing
+# slashes, or equal after `realpath -m` (GNU coreutils), which also folds `..`, `//` and symlinks to existing paths.
+same_dir() {
+  [ -n "$1" ] && [ -n "$2" ] || return 1
+  [ "$(trim_slash "$1")" = "$(trim_slash "$2")" ] && return 0
+  [ "$(realpath -m -- "$1")" = "$(realpath -m -- "$2")" ]
+}
+
 # State for the EXIT trap. Globals, because the trap runs after main's locals are gone.
 D_PROJECT='' D_TAG='' D_ENVF='' D_PREV='' D_STAGE=start D_OK=no
 
@@ -73,13 +81,14 @@ main() {
   D_PROJECT=$project D_TAG=$tag D_ENVF=$envf D_STAGE=guard
 
   # Staging must never open production's pgdata or media (PLAN.md §15.4). Its overlay mounts STAGING_DATA_ROOT,
-  # which must be set and differ from /srv/saathi and from DATA_ROOT in either env file.
+  # which must be set and differ from /srv/saathi and from DATA_ROOT in either env file, compared by string and by
+  # realpath, so `/srv//saathi/`, `/srv/saathi/../saathi` or a symlink to /srv/saathi cannot alias production.
   if [ "$project" = staging ]; then
     local sroot
     sroot=$(trim_slash "$(env_get STAGING_DATA_ROOT "$envf" || true)")
-    if [ -z "$sroot" ] || [ "$sroot" = /srv/saathi ] \
-      || [ "$sroot" = "$(trim_slash "$(env_get DATA_ROOT /srv/saathi/.env.prod || true)")" ] \
-      || [ "$sroot" = "$(trim_slash "$(env_get DATA_ROOT "$envf" || true)")" ]; then
+    if [ -z "$sroot" ] || same_dir "$sroot" /srv/saathi \
+      || same_dir "$sroot" "$(env_get DATA_ROOT /srv/saathi/.env.prod || true)" \
+      || same_dir "$sroot" "$(env_get DATA_ROOT "$envf" || true)"; then
       echo "refusing to deploy staging: STAGING_DATA_ROOT in $envf is '$sroot'; it must be set and differ from DATA_ROOT and /srv/saathi (e.g. /srv/saathi-staging)"
       exit 1
     fi

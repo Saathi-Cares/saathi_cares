@@ -212,7 +212,9 @@ In the Cloudflare dashboard for the zone `saathicares.org`:
   the Nginx master process (root) reads it at start.
 
 - [ ] Staging basic auth (`auth_basic_user_file /etc/nginx/certs/staging.htpasswd` in `staging.conf`). Nginx worker
-  processes read this file per request and run as uid 101 in `nginx:1.27-alpine`:
+  processes read this file per request and run as `user nginx` (`infra/nginx/nginx.conf:1`), which is uid 101, gid 101
+  in `nginx:1.27-alpine` (`docker run --rm nginx:1.27-alpine id nginx` printed
+  `uid=101(nginx) gid=101(nginx) groups=101(nginx),101(nginx)` on 2026-10-02):
 
   ```bash
   sudo htpasswd -c -B /srv/saathi/certs/staging.htpasswd <staging-user>

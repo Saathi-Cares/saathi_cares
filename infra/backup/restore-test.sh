@@ -13,8 +13,7 @@ dump=$(find "$work" -name '*.dump' | head -1)
 age=$(( $(date +%s) - $(stat -c %Y "$dump") ))
 [ "$age" -lt 25200 ] || fail "latest dump is ${age}s old (> 7h)" 3
 
-# The scratch database lives in the production Postgres instance (a recorded departure from PLAN.md §15.5's
-# "throwaway Postgres container"); it is dropped on exit.
+# The scratch database lives in the production Postgres instance (PLAN.md §15.5, rev 5.3); it is dropped on exit.
 testdb=restore_test_$$
 psql -d postgres -qc "create database $testdb"
 trap 'psql -d postgres -qc "drop database if exists $testdb"; rm -rf "$work"' EXIT

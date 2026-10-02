@@ -84,7 +84,7 @@ function walk(value: unknown, ancestors: Set<object>, budget: Budget, depth: num
   ancestors.add(value);
   const next = (v: unknown): unknown => walk(v, ancestors, budget, depth + 1);
   try {
-    if (value instanceof Error) return { name: value.name, message: value.message, stack: value.stack };
+    if (value instanceof Error) return serialiseError(value, next);
     if (Array.isArray(value)) return value.map(next);
     if (value instanceof Set) return Array.from(value).map(next);
     const entries = value instanceof Map ? Object.entries(Object.fromEntries(value)) : Object.entries(value);
@@ -96,4 +96,18 @@ function walk(value: unknown, ancestors: Set<object>, budget: Budget, depth: num
   } finally {
     ancestors.delete(value);
   }
+}
+
+/** `{ type, name, message, stack }` plus the error's own enumerable properties (e.g. a pg `code`), redacted like any object. */
+function serialiseError(error: Error, next: (v: unknown) => unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(error)) {
+    out[key] = isRedactedKey(key) ? CENSOR : next(v);
+  }
+  out.type = error.name;
+  out.name = error.name;
+  out.message = error.message;
+  out.stack = error.stack;
+  if (error.cause !== undefined) out.cause = next(error.cause);
+  return out;
 }

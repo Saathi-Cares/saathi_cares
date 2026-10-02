@@ -14,6 +14,9 @@ export function createLogger(opts: CreateLoggerOptions): Logger {
       level: opts.level,
       base: { service: 'saathi-web' },
       formatters: { log: (obj) => redactDeep(obj) },
+      // why: redactDeep has already turned errors into { type, name, message, stack, ... }; pino's default err
+      // serializer runs after the formatter and would overwrite `type` with the plain object's constructor, 'Object'.
+      serializers: { err: (value: unknown) => value },
       timestamp: pino.stdTimeFunctions.epochTime,
     },
     opts.destination ?? pino.destination(1),

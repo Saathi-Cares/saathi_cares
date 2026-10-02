@@ -179,6 +179,7 @@ Needs: the developer machine with the mirror (or a copy of `%USERPROFILE%\saathi
    # inside the container:
    restic snapshots --tag db
    restic restore latest --tag db --target /backups/restore
+   ls /backups/restore/backups/dumps/                          # saathi-<stamp>.dump
    psql -d postgres -c "create database saathi_restore owner saathi_owner"
    psql -d postgres -c "grant connect, create on database saathi_restore to saathi_app"
    pg_restore --dbname=saathi_restore /backups/restore/backups/dumps/saathi-<stamp>.dump
@@ -187,6 +188,10 @@ Needs: the developer machine with the mirror (or a copy of `%USERPROFILE%\saathi
    psql -d saathi -tAc "select count(*) from schema_migrations"
    exit
    ```
+
+   Unlike A2, this uses `latest`: after a VPS loss no backup of a damaged state was taken, so the mirror's newest
+   snapshot is the one to restore. If the loss followed data damage, restore by id as in A2 instead
+   (`restic restore <db-snapshot-id> ...`, chosen from the `restic snapshots` listing with the owner).
 
 4. **Media.**
 

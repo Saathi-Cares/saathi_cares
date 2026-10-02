@@ -166,14 +166,27 @@ describe('redactDeep', () => {
     expect(out.date).toBe(date);
   });
 
-  it('serialises an Error inside the payload to { name, message, stack }', () => {
+  it('serialises an Error inside the payload to { type, name, message, stack }', () => {
     const out = redactDeep({ cause: new TypeError('boom') }) as unknown as {
-      cause: { name: unknown; message: unknown; stack: unknown };
+      cause: { type: unknown; name: unknown; message: unknown; stack: unknown };
     };
-    expect(Object.keys(out.cause).sort()).toEqual(['message', 'name', 'stack']);
+    expect(Object.keys(out.cause).sort()).toEqual(['message', 'name', 'stack', 'type']);
+    expect(out.cause.type).toBe('TypeError');
     expect(out.cause.name).toBe('TypeError');
     expect(out.cause.message).toBe('boom');
     expect(typeof out.cause.stack).toBe('string');
+  });
+
+  it('keeps an Error own properties and its cause, redacting by key like any object', () => {
+    const cause = Object.assign(new Error('inner'), { phone: '9876543210' });
+    const err = Object.assign(new Error('outer', { cause }), { code: '23505', email: 'a@b.c' });
+    const out = redactDeep({ err }) as unknown as {
+      err: { code: unknown; email: unknown; cause: { message: unknown; phone: unknown } };
+    };
+    expect(out.err.code).toBe('23505');
+    expect(out.err.email).toBe('[redacted]');
+    expect(out.err.cause.message).toBe('inner');
+    expect(out.err.cause.phone).toBe('[redacted]');
   });
 
   it('replaces values nested deeper than the depth limit', () => {

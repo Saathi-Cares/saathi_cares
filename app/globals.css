@@ -28,8 +28,8 @@
     --muted: 40 15% 94%;
     --muted-foreground: 200 15% 45%;
 
-    /* Accent - Hopeful coral */
-    --accent: 12 70% 55%;
+    /* Accent - Hopeful coral (placeholder brand colour). 42% lightness keeps --accent-foreground text at 5.46:1, 4.61:1 on the /90 hover. */
+    --accent: 12 70% 42%;
     --accent-foreground: 45 30% 98%;
 
     --destructive: 0 84.2% 60.2%;
@@ -47,7 +47,7 @@
 
     --coral-50: 12 80% 97%;
     --coral-500: 12 70% 55%;
-    --coral-600: 12 70% 48%;
+    --coral-600: 12 70% 35%;
 
     --sand-100: 35 35% 93%;
 
