@@ -1081,7 +1081,7 @@ Frontend nav hides what the user cannot do. That is convenience only; the API an
 | Webhooks | HMAC signature verification, event id dedup, replay window check, processing inside transaction | §13.3 |
 | Payments | no card data touches our servers (gateway-hosted checkout); amounts trusted only from verified webhook/API fetch, never from the browser | §18 Phase 4 |
 | Database | separate roles (§8.8), no superuser at runtime, `DELETE` withheld on protected tables, TLS between containers unnecessary (private network) but `password_encryption = scram-sha-256` | `infra/postgres/init.sql` |
-| Containers | non-root user, read-only root FS for app (`.next/cache` and `/tmp` writable), `no-new-privileges`, only Nginx publishes ports, images pinned by tag (digests from Phase 7), Trivy scan nightly (non-blocking, reviewed weekly) | `Dockerfile`, compose |
+| Containers | non-root user, read-only root FS for app (`.next/cache` and `/tmp` writable), `no-new-privileges`, only Nginx publishes ports, images pinned by tag (digests from Phase 7), Trivy scan nightly (HIGH/CRITICAL report kept 90 days; a CRITICAL with a fix available fails the job) | `Dockerfile`, compose |
 | Host | SSH keys only, fail2ban, ufw (22/80/443), unattended security upgrades, Docker socket not exposed | runbook `docs/runbooks/host-setup.md` |
 | Dependencies | Dependabot monthly, grouped; `npm audit --audit-level=high` nightly; lockfile committed | `.github/*` |
 | Backups | encrypted at rest (restic), every 6 h to a separate VPS volume, mirrored to the developer's machine, monthly tested restore, keys held by the developer with a sealed copy at the organisation | §15.5, D24 |
@@ -1317,7 +1317,7 @@ lint (eslint incl. the one boundary rule) → typecheck (tsc --noEmit)
 → build (next build) → smoke e2e (Playwright, 4 flows: login+MFA, register patient, dentist review, CMS publish)
 ```
 
-Target under 8 minutes. `nightly.yml` runs the full Playwright suite, `npm audit --audit-level=high`, Trivy on the latest image (non-blocking, reviewed weekly), and dependency review.
+Target under 8 minutes. `nightly.yml` runs the full Playwright suite, `npm audit --audit-level=high`, Trivy on the latest image (failing on a CRITICAL with a fix available), and dependency review.
 
 ### 16.3 `deploy.yml`
 

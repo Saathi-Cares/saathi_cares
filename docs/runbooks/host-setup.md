@@ -386,6 +386,8 @@ Then:
   `VPS_USER` (`deploy`), `VPS_SSH_KEY` (a private key made for Actions, `ssh-keygen -t ed25519 -f gha_deploy -N ""`,
   whose `.pub` goes into `/home/deploy/.ssh/authorized_keys`). `deploy.yml` reads exactly these three; it does not use a
   `GHCR_PAT` secret (the build pushes with the workflow's `GITHUB_TOKEN`, the VPS pulls with the token from step 3).
+- [ ] Same page: `SLACK_WEBHOOK_URL`, the webhook from `.env.prod`. Only `nightly.yml` reads it, to post the nightly
+  result and the Trivy counts (`deploy-and-rollback.md`, "Vulnerability scanning"); without it that post is skipped.
 - [ ] The GHCR package `ghcr.io/saathi-cares/app` must let this repository's Actions write to it (package settings →
   Manage Actions access), and Actions must be enabled for the repository.
 

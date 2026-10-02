@@ -618,7 +618,7 @@ NODE_ENV=test
 APP_URL=http://localhost:3000
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/saathi_test
 MEDIA_ROOT=./.test-media
-MEDIA_SIGNING_SECRET=0123456789abcdef0123456789abcdef
+MEDIA_SIGNING_SECRET=<64-hex-from-openssl-rand>
 JOBS_ENABLED=false
 ```
 

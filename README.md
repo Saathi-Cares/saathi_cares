@@ -115,3 +115,10 @@ What the scripts do once Task 8 has installed them on a VPS (none of this runs t
 - Backups: the `backup` container backs up to `/srv/saathi/backups/restic` every 6 h (00:15, 06:15, 12:15, 18:15 IST) and runs a restore test monthly (03:30 IST on the 1st); it records each outcome in a result file that `check.sh` alerts on. `scripts/mirror-backup.*` copies the repository to the developer's machine, daily once scheduled. `docs/runbooks/disaster-recovery.md`.
 - Logs: `infra/checks/logq.sh errors [since]`, `logq.sh request <id>`, `logq.sh slow [since]`, `logq.sh login-failures [since]` (`since` defaults to `2h`).
 - Runbooks in `docs/runbooks/`: `host-setup.md` (new VPS, step by step), `deploy-and-rollback.md`, `disaster-recovery.md`, `breach-response.md`, `key-envelope.md` (the printed page for the founder's sealed envelope).
+
+Vulnerability scanning runs on GitHub, not on the VPS: `.github/workflows/nightly.yml` builds the image every night
+(03:00 IST) and scans it with Trivy. The full HIGH and CRITICAL report is the artifact `trivy-report` on the run
+(Actions → nightly → the run → Artifacts; kept 90 days) and is printed as a table in the job log. The job fails on a
+CRITICAL vulnerability that has a fix available, and on `npm audit --audit-level=high`; GitHub's failed-workflow email
+then reaches the owner. When the repository secret `SLACK_WEBHOOK_URL` is set, the last step posts `[OK]` or `[ALERT]`
+with the job result and the CRITICAL/HIGH counts to Slack. Details: `docs/runbooks/deploy-and-rollback.md`.

@@ -171,3 +171,30 @@ Never rename a column in place, change a type in place, or drop something the pr
 - `infra/backup/*`: the `backup` image is built on the VPS and not rebuilt by a deploy: `$C build backup && $C up -d backup`;
 - `infra/checks/crontab`: `crontab /srv/saathi/repo/infra/checks/crontab` (the scripts themselves are read from the
   checkout on every run).
+
+## Vulnerability scanning
+
+Written from `.github/workflows/nightly.yml`. The `nightly` workflow runs at 21:30 UTC (03:00 IST) and on demand
+(Actions → nightly → Run workflow). After the build, the full Playwright suite and `npm audit --audit-level=high`, it
+builds the image as `app:nightly` and runs Trivy twice:
+
+1. **Report.** Every HIGH and CRITICAL vulnerability, with or without a fix, goes to `trivy-report.json`, which is
+   printed as a table in the job log and uploaded as the artifact `trivy-report` (Actions → nightly → the run →
+   Artifacts), kept for 90 days. This step never fails the job.
+2. **Gate.** A CRITICAL vulnerability that has a fixed version available fails the job (`ignore-unfixed`, exit code 1).
+   Fix it by updating the base image or the dependency, then re-run the workflow. HIGH findings and CRITICAL findings
+   without a fix do not fail the job; read them in the report.
+
+Who is told:
+
+- A failed run (the gate, `npm audit`, e2e or the build) produces GitHub's failed-workflow email. For a scheduled
+  workflow GitHub sends it to the user who last changed the `cron` line in `nightly.yml`, provided that user has
+  Actions notifications on (GitHub → Settings → Notifications → Actions).
+- When the repository secret `SLACK_WEBHOOK_URL` is set (Settings → Secrets and variables → Actions; the same webhook as
+  in `.env.prod`, added in `host-setup.md` step 11), the last step posts one line to Slack after every run, in the
+  `infra/checks/check.sh` style, for example `[OK] nightly: success; Trivy CRITICAL 0, HIGH 7 (<run URL>)`; any result
+  other than success is posted as `[ALERT]`. Without the secret the step prints that it is not set and posts nothing.
+  If the job stopped before the scan, the line says there is no Trivy report.
+
+Scheduled workflows run only from the default branch (`main`), and GitHub disables them in a public repository after 60
+days without activity; re-enable from the Actions tab.

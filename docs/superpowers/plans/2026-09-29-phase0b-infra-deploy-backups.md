@@ -120,7 +120,7 @@ docker build -t saathi-cares/app:local .
 docker run --rm --network host -e DATABASE_URL_MIGRATIONS=postgres://postgres:postgres@127.0.0.1:5432/saathi saathi-cares/app:local node dist/migrate.js
 docker run --rm -d --name app-smoke --network host \
   -e APP_URL=http://localhost:3000 -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/saathi \
-  -e MEDIA_ROOT=/tmp/media -e MEDIA_SIGNING_SECRET=0123456789abcdef0123456789abcdef -e JOBS_ENABLED=true \
+  -e MEDIA_ROOT=/tmp/media -e MEDIA_SIGNING_SECRET="$(openssl rand -hex 32)" -e JOBS_ENABLED=true \
   --tmpfs /tmp saathi-cares/app:local
 sleep 5; curl -s http://localhost:3000/api/health/ready; docker logs app-smoke | tail -5; docker rm -f app-smoke
 ```
@@ -1035,7 +1035,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/saathi_test
       APP_URL: http://localhost:3000
       MEDIA_ROOT: ./.test-media
-      MEDIA_SIGNING_SECRET: 0123456789abcdef0123456789abcdef
+      MEDIA_SIGNING_SECRET: <64-hex-from-openssl-rand>
       JOBS_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
@@ -1079,7 +1079,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/saathi_test
       APP_URL: http://localhost:3000
       MEDIA_ROOT: ./.test-media
-      MEDIA_SIGNING_SECRET: 0123456789abcdef0123456789abcdef
+      MEDIA_SIGNING_SECRET: <64-hex-from-openssl-rand>
       JOBS_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
