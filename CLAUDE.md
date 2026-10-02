@@ -33,7 +33,7 @@ A test written by the same process that wrote the code is not independent eviden
 ## Git
 
 - Work on a feature branch; per-task local commits with plain messages. Never add `Co-Authored-By` or any AI attribution trailer to commits or pull requests.
-- Merge to `main` only when the owner says so. Push only when the owner says so, in their own words.
+- `main` is protected by a repository ruleset (no deletion, no force push, linear history, required checks `test` and `secrets`, no bypass). Changes reach `main` through a pull request: push the feature branch, let CI pass, then merge with `gh pr merge --squash` (or rebase). A direct push to `main` is rejected. Open or merge a pull request only when the owner says so, in their own words. The repository is public: never commit anything the organisation would not publish.
 - Commits must leave the gate green: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run test:int` (needs the `saathi-test-pg` container on 127.0.0.1:5434, see `.env.test.local`), `npm run format:check`; `npm run build` and `npm run test:e2e` before a merge.
 
 ## Planning and execution
