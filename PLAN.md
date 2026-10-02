@@ -8,6 +8,8 @@ rev 5.2 (2026-10-02): Phase 0 exit criteria split into repository and deployment
 
 rev 5.3 (2026-10-02): restore-test wording matches `infra/backup/restore-test.sh`; digest history added.
 
+rev 5.4 (2026-10-02): §8.10 data structure strategy by activity and §8.5.12 embeddings and retrieval (D30, proposed) added at the owner's request.
+
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
@@ -320,6 +322,8 @@ Context: the founder wants patients to phone in and have an AI agent capture the
 
 **D29. WhatsApp reminders repeat what the dentist recorded, and only with consent.**
 Context: the founder wants post-consultation reminders (ointment three times a day, medication, appointments, rebooking) on WhatsApp. This partially supersedes D23's "no patient messaging": WhatsApp becomes the first outbound channel. Decision: reminders are generated only from a dentist's prescription entries and from scheduled follow-ups and appointments; the system composes no clinical advice; every message is a pre-approved template; sending requires a recorded `contact_whatsapp` consent and stops on a "STOP" reply; inbound "reschedule" replies create a task for a person, they do not change the schedule automatically; every send, delivery and reply is a `patient_communications` row. The WhatsApp Business Platform and its provider are paid external services accepted like the payment gateway. Rejected: free-form generated messages, unofficial WhatsApp automation (account bans, no consent trail), and SMS as the first channel (the founder asked for WhatsApp; SMS stays parked).
+
+**D30. Embeddings live in Postgres (`pgvector`), are computed by jobs from de-identified text and images with locally run models, and are versioned like any other model output.** Proposed 2026-10-02; the owner approves it with the Phase 5 plan.
 
 **D22. Financial year receipt numbering is gap-free by construction.**
 Postgres sequences skip on rollback, and 80G receipts are expected to be sequential within the Indian financial year (April–March). Decision: a `receipt_counters` row per financial year, incremented under row lock inside the same transaction that marks the donation succeeded. See §8.6.
@@ -795,6 +799,20 @@ inbound_messages         -- WhatsApp replies
 
 `patient_communications.channel` gains `'whatsapp'` as a live channel in Phase 6; `consents.type` gains `'call_recording'`. The camp registration form (Phase 2) reads `pre_registrations` by phone number and pre-fills with "from call, please confirm" markers.
 
+#### 8.5.12 Embeddings and retrieval (Phase 5; D30, proposed)
+
+What embeddings are for in this product, and only this: (1) similar-case lookup for the reviewing dentist (image embeddings from the screening model's penultimate layer: "show me past lesions that look like this one and what they turned out to be"); (2) semantic search over the free-text columns (chief complaint, dentist notes, counselling content, intake-call transcripts) for the clinical team and for reporting; (3) retrieval for an assistant that answers questions from the organisation's own protocols, consent texts and runbooks (RAG), which never diagnoses and never reads patient rows. Risk stratification from structured fields (age, tobacco baseline, findings) is a tabular model over columns and needs no embeddings.
+
+```
+embeddings   id, subject_type ('screening_image','encounter_note','counselling_session','intake_transcript','document'),
+             subject_id uuid, model_id fk ai_models, dims int, embedding vector(dims), text_hash text null,
+             created_at;  unique(subject_type, subject_id, model_id);  index hnsw (embedding vector_cosine_ops)
+```
+
+Rules: the `pgvector` extension in the same database, under the same roles, on the same encrypted volume, with rows deleted when their subject is deleted or consent is withdrawn (no second store to forget); embeddings are computed by a pg-boss job on write and again when the model changes, from de-identified text (names, phones, codes stripped by the same redaction rules as logs) so a vector can never be a copy of an identifier; the model is a row in `ai_models` with task `'text_embedding'` or `'image_embedding'`, and a model change is a new row plus a re-embed job, never an in-place overwrite; models run locally (ONNX; an open sentence-embedding model for text, the screening model for images) because §8.9 rule 8 forbids sending PHI to an external API; `text_hash` skips re-embedding unchanged text. At the expected scale (about 100 patients a camp day, tens of thousands of rows a year) `pgvector` with an HNSW index answers in milliseconds; a separate vector database is not justified below millions of rows and would be a second copy of PHI.
+
+What Phases 0–4 do so that this works later without a migration of the model: free text in its own columns (above); images immutable with `sha256`; `ai_models.task` is free text, not an enum of one; stable ids; `schema_version` on every JSONB column. Nothing is embedded before Phase 5 and the owner approves the use cases then.
+
 ### 8.6 Donations and payments (schema fixed now, built in Phase 8 when the organisation asks)
 
 ```
@@ -861,6 +879,28 @@ Authentication and authorisation say *who* may act. This section says *what* the
 10. **Legal mapping and breach.** Deliverable in Phase 3: `docs/privacy/dpdp-mapping.md` mapping consent, purpose limitation, data-principal rights and retention to the controls above under India's Digital Personal Data Protection Act 2023, plus a breach runbook (contain, assess, notify leadership within 24 h, and meet the CERT-In reporting obligation).
 
 ---
+
+### 8.10 Data structure strategy by activity
+
+One engine (PostgreSQL 16, D-§3) and three shapes: relational columns for anything that is queried, joined, counted, authorised on or reported on; JSONB only for a thing that is edited and read as a whole (a checklist, a CMS block, a model manifest), always zod-validated with a `schema_version`; files on disk for binaries, never `bytea`. The table says which shape each activity uses and why; the schemas are in the sections named.
+
+| Activity | Shape | Why this shape | Section |
+| --- | --- | --- | --- |
+| Users, roles, sessions, consents, audit | Relational; audit is append-only with `before`/`after` JSONB and `changed_fields` | Row-level authorisation and a tamper-evident history need columns and constraints | §8.1 |
+| CMS pages and sections | Relational page and section rows; section `data` JSONB per section type, versioned rows | Editors change a block as a whole; each section type has its own zod schema and evolves independently | §8.2 |
+| Media (site images, clinical photographs) | Files under `MEDIA_ROOT`; a metadata row per file with `sha256 unique`, `variants` JSONB | Binaries stay out of the database; content addressing deduplicates and makes files immutable | §8.3 |
+| Enquiries | Relational row with a generated `tsvector` | Full-text search in the same engine | §8.4 |
+| Patients | Relational; generated `tsvector` plus `pg_trgm` GIN for name, phone, code, village; identifiers that need exact lookup encrypted in the application (§8.9) | Search over tens of thousands of rows in milliseconds without a second index to keep consistent (§4 trade-off) | §8.5.1 |
+| Encounters, vitals, medical and dental history | Relational encounter row; history and vitals as versioned JSONB snapshots per encounter; an expression index the first time a report filters on one flag | A history is a checklist edited as a whole and must show what was true at that visit | §8.5.4 |
+| Screening, images, results, dentist review, referral, prescription | Relational rows with text enums and FKs; findings and checklists as zod-validated JSONB arrays; images as media rows | The workflow state machine lives in columns; the clinical detail is read as one document | §8.5.5–§8.5.8 |
+| Programmes (tobacco cessation, OPMD surveillance) | Relational enrolment and session rows; baseline and session content JSONB | Longitudinal reporting joins on columns; the counselling content is a form | §8.5.9 |
+| AI models, inferences, labels | Relational; manifests JSONB; `labels` materialised by a job from dentist reviews and never hand-edited | Provenance and sign-off are rows with constraints; training data is derived, not authored | §8.5.10 |
+| Embeddings and retrieval | `pgvector` rows keyed by subject and model, de-identified text only | See §8.5.12 | §8.5.12 |
+| Patient engagement (intake calls, reminders) | Relational; the draft from a call is JSONB with a confidence per field | The draft is reviewed field by field and is never the record (D28) | §8.5.11 |
+| Jobs and notifications | pg-boss tables in the `pgboss` schema (`SKIP LOCKED` queue) | One engine; transactional enqueue with the business write | §8.7 |
+| Reporting | SQL views over the relational tables; a materialised view only after a query is measured slow | Reports stay consistent with the source rows by construction | §8.5 reporting |
+
+Rules that follow: a JSONB field never holds an identifier that another table must join on; every JSONB column has a zod schema in `src/server/<module>/schemas.ts` and a `schema_version`; free text that a person writes (chief complaint, notes, counselling advice, call transcripts) is its own `text` column, not a key inside JSONB, so it can be searched, redacted and embedded; ids are `uuid` v7 and stable for the life of the row.
 
 ## 9. API design contract
 
