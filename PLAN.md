@@ -882,7 +882,7 @@ Authentication and authorisation say *who* may act. This section says *what* the
 
 ### 8.10 Data structure strategy by activity
 
-One engine (PostgreSQL 16, D-§3) and three shapes: relational columns for anything that is queried, joined, counted, authorised on or reported on; JSONB only for a thing that is edited and read as a whole (a checklist, a CMS block, a model manifest), always zod-validated with a `schema_version`; files on disk for binaries, never `bytea`. The table says which shape each activity uses and why; the schemas are in the sections named.
+One engine (PostgreSQL 16, D10 in §6) and three shapes: relational columns for anything that is queried, joined, counted, authorised on or reported on; JSONB only for a thing that is edited and read as a whole (a checklist, a CMS block, a model manifest), always zod-validated with a `schema_version`; files on disk for binaries, never `bytea`. The table says which shape each activity uses and why; the schemas are in the sections named.
 
 | Activity | Shape | Why this shape | Section |
 | --- | --- | --- | --- |
@@ -890,7 +890,7 @@ One engine (PostgreSQL 16, D-§3) and three shapes: relational columns for anyth
 | CMS pages and sections | Relational page and section rows; section `data` JSONB per section type, versioned rows | Editors change a block as a whole; each section type has its own zod schema and evolves independently | §8.2 |
 | Media (site images, clinical photographs) | Files under `MEDIA_ROOT`; a metadata row per file with `sha256 unique`, `variants` JSONB | Binaries stay out of the database; content addressing deduplicates and makes files immutable | §8.3 |
 | Enquiries | Relational row with a generated `tsvector` | Full-text search in the same engine | §8.4 |
-| Patients | Relational; generated `tsvector` plus `pg_trgm` GIN for name, phone, code, village; identifiers that need exact lookup encrypted in the application (§8.9) | Search over tens of thousands of rows in milliseconds without a second index to keep consistent (§4 trade-off) | §8.5.1 |
+| Patients | Relational; generated `tsvector` plus `pg_trgm` GIN for name, phone, code, village; identifiers that need exact lookup encrypted in the application (§8.9) | Search over tens of thousands of rows in milliseconds without a second index to keep consistent (D10) | §8.5.1 |
 | Encounters, vitals, medical and dental history | Relational encounter row; history and vitals as versioned JSONB snapshots per encounter; an expression index the first time a report filters on one flag | A history is a checklist edited as a whole and must show what was true at that visit | §8.5.4 |
 | Screening, images, results, dentist review, referral, prescription | Relational rows with text enums and FKs; findings and checklists as zod-validated JSONB arrays; images as media rows | The workflow state machine lives in columns; the clinical detail is read as one document | §8.5.5–§8.5.8 |
 | Programmes (tobacco cessation, OPMD surveillance) | Relational enrolment and session rows; baseline and session content JSONB | Longitudinal reporting joins on columns; the counselling content is a form | §8.5.9 |
