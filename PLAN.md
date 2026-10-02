@@ -10,6 +10,8 @@ rev 5.3 (2026-10-02): restore-test wording matches `infra/backup/restore-test.sh
 
 rev 5.4 (2026-10-02): §8.10 data structure strategy by activity and §8.5.12 embeddings and retrieval (D30, proposed) added at the owner's request.
 
+rev 5.5 (2026-10-02): the host-dependent Phase 0 exit criteria moved to a new Phase 1D (first deployment) so Phase 0 closes cleanly; §8.11 in-process data structures and complexity budget added.
+
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
@@ -902,6 +904,28 @@ One engine (PostgreSQL 16, D10 in §6) and three shapes: relational columns for 
 
 Rules that follow: a JSONB field never holds an identifier that another table must join on; every JSONB column has a zod schema in `src/server/<module>/schemas.ts` and a `schema_version`; free text that a person writes (chief complaint, notes, counselling advice, call transcripts) is its own `text` column, not a key inside JSONB, so it can be searched, redacted and embedded; ids are `uuid` v7 and stable for the life of the row.
 
+### 8.11 In-process data structures and the complexity budget
+
+The data lives in Postgres; the Node process holds only what one request or one job needs. So the structures that decide memory and latency are the database's indexes, and the in-process rule is "bounded or streaming". The table names, per operation, the structure that does the work, its cost, and what bounds memory. "Exists" means the code is in the repository today; "rule" means it binds the phase that builds the feature.
+
+| Operation | Structure doing the work | Cost per call | What bounds memory | Status |
+| --- | --- | --- | --- | --- |
+| Exact lookup (patient code, phone, email, id) | Postgres B-tree unique index | O(log n), about 20 page reads at a million rows, nearly all from `shared_buffers` | Index pages live in Postgres, not in Node | Rule (Phase 1–2) |
+| Fuzzy or prefix search on name, village | GIN inverted index over trigrams (`pg_trgm`) and `tsvector` | O(k) posting-list reads, k = matching trigrams; the inverted index is the persisted equivalent of a trie, so no in-process trie | Postgres | Rule (Phase 2) |
+| Every list endpoint (patients, encounters, tasks, reports) | Keyset pagination on an indexed `(created_at, id)` pair; never `OFFSET` (O(n)) | O(log n + page) per page; page size ≤ 100 | Node holds one page | Rule (Phase 1 on) |
+| Patient timeline | One indexed query with joins and a limit; no N+1 | O(log n + rows returned) | One page of rows | Rule (Phase 2) |
+| Job queue | pg-boss table with its partial index on `(name, state, priority, created_on)` and `SKIP LOCKED` claims | O(log n) to claim | Node holds at most `JOBS_CONCURRENCY` jobs | Exists (§8.7, `src/server/jobs/`) |
+| Rate limiting | Nginx `limit_req` zone: red-black tree with LRU expiry in a fixed shared-memory zone (10 MB ≈ 160,000 addresses) | O(log n) per request | Fixed by the zone size; oldest states are evicted | Exists (`infra/nginx/snippets/rate-limits.conf`) |
+| Request context | `AsyncLocalStorage` holding one small object per request | O(1) | One object per in-flight request | Exists (`src/server/observability/request-context.ts`) |
+| Log redaction | Iterative walk with an ancestors set and a node budget (`MAX_NODES`, `MAX_DEPTH`) | O(min(nodes, budget)) | The budget | Exists (`src/server/observability/redaction.ts`) |
+| Media files | Files on disk addressed by `sha256`; the hash is a unique index | O(1) path computation; O(log n) dedupe | Streams, never whole files in memory | Adapter exists (§8.3); rule for uploads (Phase 2) |
+| Public page cache | Next.js static output and the Cloudflare edge; no in-process cache | O(1) file or edge read | Disk and the edge | Rule (Phase 4) |
+| Any in-process cache, if one is ever justified | Bounded LRU: a `Map` with insertion order, a size cap and a TTL | O(1) get and set | The cap | Rule; none exists today |
+| Similar-case and semantic search | HNSW graph in `pgvector` | Approximately O(log n) | Postgres | Rule (Phase 5, §8.5.12) |
+| Reports and exports | Aggregation in SQL; exports streamed from a cursor in batches | O(rows) streamed, never materialised | One batch | Rule (Phase 3) |
+
+Rules that follow (binding from Phase 1): no in-process collection grows with the size of the data without a cap or a cursor; `Map` and `Set` for O(1) lookups and arrays only for small ordered lists; no hand-written linked lists, heaps or trees, because ordering and priority are indexed columns in Postgres; a list endpoint's query plan is proven to use its index by an `EXPLAIN` integration test once the table has a realistic row count (Phase 2 seeds that). Why not O(1) for everything: an O(1) in-memory structure would have to hold the data in the Node process, which is exactly what a 4 GB host cannot afford and what backups and restores would then miss; the target is latency that does not grow with the data in practice, and per-request memory that does not grow with the data at all.
+
 ## 9. API design contract
 
 ### 9.1 Conventions
@@ -1235,7 +1259,7 @@ One VPS, the cheapest that meets the spec: 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS, I
 
 There is no backup host in v1 (D24). The restic repository lives on the attached volume and is mirrored to the developer's machine; the same VPS runs the monthly restore test in a throwaway container.
 
-**Status (2026-10-02): hosting is undecided.** The owner will choose between a VPS and a cloud instance and say when; the Compose stack (§15.2) is host-agnostic, so the specification above holds for either. Until then the application runs on the developer's machine (`dev` profile, §15.4), and the organisation's name and domain (`saathicares.org`, `staging.saathicares.org`) are provisional. Nothing in Phases 1–3 *development* requires the host; the first live camp (the Phase 2 pilot, §18) and any real patient data do, and so do the staging environment (§15.4) and with it the per-phase demo on staging (§18). The steps that need the host are the Phase 0 deployment criteria (§18 Phase 0).
+**Status (2026-10-02): hosting is undecided.** The owner will choose between a VPS and a cloud instance and say when; the Compose stack (§15.2) is host-agnostic, so the specification above holds for either. Until then the application runs on the developer's machine (`dev` profile, §15.4), and the organisation's name and domain (`saathicares.org`, `staging.saathicares.org`) are provisional. Nothing in Phases 1–3 *development* requires the host; the first live camp (the Phase 2 pilot, §18) and any real patient data do, and so do the staging environment (§15.4) and with it the per-phase demo on staging (§18). The steps that need the host are the Phase 1D criteria (§18 Phase 0).
 
 ### 15.2 Containers (`infra/compose.yaml`, profiles: `core`, `dev`, `observability`; staging is `-p staging --profile core` with `infra/compose.staging.yaml`)
 
@@ -1353,14 +1377,7 @@ Exit criteria (split 2026-10-02, rev 5.2, because hosting is deferred, §15.1):
 - `npm run lint` and `tsc` clean;
 - the unit, integration and e2e suites are green.
 
-*(b) Deployment criteria* — deferred, need a host; executed as **"Phase 0 deployment"** when the owner chooses hosting, following `docs/runbooks/host-setup.md` and Task 8 of `docs/superpowers/plans/2026-09-29-phase0b-infra-deploy-backups.md`, and complete before any real patient data is entered (the first live camp, Phase 2):
-- `docker compose up` on a clean machine serves the app over HTTPS;
-- CI green on GitHub;
-- a tagged release deploys to prod through the approval gate and `rollback.sh` returns to the previous tag;
-- a restore test has passed on the host and the mirror exists on the developer's machine;
-- every alert in §14.4 has been triggered once on purpose and seen in the alert channel.
-
-The scope items above that need the host (host setup runbook executed, hosted uptime monitor, sealed key envelope handed to the founder, the scheduled restore test) are done in the same Phase 0 deployment. The evidence for (a) and the status of (b) are in `docs/adr/0001-phase-0-exit.md`.
+The deployment criteria that were listed here until rev 5.5 now form their own milestone, **Phase 1D — First deployment** (below), so that Phase 0 is closed and the host-dependent work is tracked on its own.
 
 ### Phase 1 — Identity, access, audit (≈ 2 weeks)
 
@@ -1374,6 +1391,19 @@ The scope items above that need the host (host setup runbook executed, hosted up
 - Authorisation matrix integration test scaffold; privacy test scaffold.
 
 Exit criteria: authz matrix covers 100 % of endpoints; a disabled user's session is rejected within one request; MFA cannot be bypassed by cookie edit (test); audit rows for every mutation with actor and entity and no PHI values (test); login e2e passes on a tablet viewport.
+
+### Phase 1D — First deployment (when hosting is chosen; ≈ 1 week of owner and developer time; must be complete before the Phase 2 pilot)
+
+**Goal:** the Phase 0 stack runs on the chosen host (VPS or cloud instance, §15.1) with the deploy pipeline, backups, restore test, health checks, alerts and the uptime monitor proven against reality, before any real patient data exists. Owner-executed steps are in `docs/runbooks/host-setup.md`; the task list is Task 8 of `docs/superpowers/plans/2026-09-29-phase0b-infra-deploy-backups.md`. It can run in parallel with Phase 1 development and needs: the hosting account, the domain and Cloudflare zone, the Slack webhook, the GitHub environments, and the sealed key envelope.
+
+Exit criteria (moved from Phase 0 in rev 5.5; they need a host): executed when the owner chooses hosting, following `docs/runbooks/host-setup.md` and Task 8 of `docs/superpowers/plans/2026-09-29-phase0b-infra-deploy-backups.md`, and complete before any real patient data is entered (the first live camp, Phase 2):
+- `docker compose up` on a clean machine serves the app over HTTPS;
+- CI green on GitHub;
+- a tagged release deploys to prod through the approval gate and `rollback.sh` returns to the previous tag;
+- a restore test has passed on the host and the mirror exists on the developer's machine;
+- every alert in §14.4 has been triggered once on purpose and seen in the alert channel.
+
+The Phase 0 scope items that need the host (host setup runbook executed, hosted uptime monitor, sealed key envelope handed to the founder, the scheduled restore test) are done in this milestone. The evidence for (a) and the status of (b) are in `docs/adr/0001-phase-0-exit.md`.
 
 ### Phase 2 — HMIS capture and dentist review, first camp pilot (≈ 7 weeks)
 
