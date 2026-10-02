@@ -27,7 +27,7 @@ jobs:
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="sha-${GITHUB_SHA::12}"; fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           push: true
           tags: ghcr.io/saathi-cares/app:${{ steps.meta.outputs.tag }},ghcr.io/saathi-cares/app:sha-${{ github.sha }}
