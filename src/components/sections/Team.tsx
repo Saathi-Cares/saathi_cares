@@ -35,7 +35,7 @@ export function Team({ content }: { content: TeamContent }) {
                 {member.name}
               </h3>
               <p className="text-muted-foreground text-sm md:text-base mb-3">{member.title}</p>
-              <p className="text-sm text-muted-foreground/80 mb-4">{member.credentials}</p>
+              <p className="text-sm text-muted-foreground mb-4">{member.credentials}</p>
 
               {member.linkedin && (
                 <a
