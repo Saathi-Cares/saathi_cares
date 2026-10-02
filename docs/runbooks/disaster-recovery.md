@@ -2,7 +2,7 @@
 
 Two scenarios: **A**, the VPS is fine but a release or the data is bad; **B**, the VPS is gone. Both are written from
 the files in `infra/backup/`, `scripts/` and `infra/compose.yaml`; the restore procedure itself has not yet been run end
-to end on a real host. The first rehearsal (checklist at the end) is a Phase 0 exit criterion (PLAN.md §15.5, §18).
+to end on a real host. The first rehearsal (checklist at the end) is due before the first real patient record exists (PLAN.md §15.5); it needs a host, so it is done in Phase 1D, first deployment (PLAN.md §18).
 
 **The key envelope.** Scenario B needs `RESTIC_PASSWORD` and, if the developer is unreachable, everything else on the
 printed page described in `key-envelope.md`. The sealed envelope is held by the organisation's founder (PLAN.md D24).
@@ -218,9 +218,9 @@ Needs: the developer machine with the mirror (or a copy of `%USERPROFILE%\saathi
 
 ## Rehearsal checklist
 
-Rehearse scenario B on a throwaway VPS before the first real patient record exists (Phase 0 exit) and again before
-public launch (Phase 7). Use the latest mirror; do not switch production DNS (check with `--resolve` as in B5). RTO
-target 4 h.
+Rehearse scenario B on a throwaway VPS before the first real patient record exists (Phase 1D, first deployment) and
+again before public launch (Phase 7). Use the latest mirror; do not switch production DNS (check with `--resolve` as in
+B5). RTO target 4 h.
 
 | Step | Started | Finished | Minutes | Notes |
 | --- | --- | --- | --- | --- |

@@ -2,7 +2,7 @@
 
 Dental EMR and public website for Saathi Cares (SHC Foundation). Plan and decisions: `PLAN.md`.
 
-Phase 0A (the public pages and the server foundation) is built. Phase 0B code (Docker images, Compose stacks, Nginx, backups, host checks, CI and deploy workflows, runbooks) is in the repository; nothing is deployed. Task 8 of the Phase 0B plan, run by the owner, sets up the VPS, Slack, the uptime monitor and the developer-machine mirror. There is no login, no admin and no patient data yet.
+Phase 0A (the public pages and the server foundation) is built. Phase 0B code (Docker images, Compose stacks, Nginx, backups, host checks, CI and deploy workflows, runbooks) is in the repository; nothing is deployed. Task 8 of the Phase 0B plan, run by the owner as Phase 1D, first deployment (PLAN.md §18), sets up the VPS, Slack, the uptime monitor and the developer-machine mirror. There is no login, no admin and no patient data yet.
 
 ## Run it locally (10 minutes)
 

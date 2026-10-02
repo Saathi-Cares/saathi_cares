@@ -5,7 +5,7 @@ Read `PLAN.md` first. It is the single source of truth for what is built, how, a
 ## Current state (2026-10-02)
 
 - Phase 0 is complete on the repository side (see `docs/adr/0001-phase-0-exit.md`). Nothing is deployed. The application runs on the developer's machine with the `dev` Compose profile (`infra/compose.dev.yaml`) or `npm run dev`.
-- Hosting (VPS or cloud) is deliberately undecided. The owner will say when it is time; until then do not plan work that needs a server, and do not treat the deployment exit criteria as met. The deployment steps live in `docs/runbooks/host-setup.md` and `docs/superpowers/plans/2026-09-29-phase0b-infra-deploy-backups.md` Task 8.
+- Hosting (VPS or cloud) is deliberately undecided. The owner will say when it is time; until then do not plan work that needs a server, and do not treat the deployment exit criteria as met. The deployment steps are Phase 1D (first deployment) in `PLAN.md` §18; they are carried out with `docs/runbooks/host-setup.md` and `docs/superpowers/plans/2026-09-29-phase0b-infra-deploy-backups.md` Task 8.
 - The organisation's name and domain are provisional (`saathicares.org`, `staging.saathicares.org`, email `cares@saathiventures.com`). Contact details, statistics sources, logos and clinical wording are placeholders until the organisation returns `docs/requirements/SaathiCares-information-request.xlsx`. Do not block development on them; keep placeholder text obvious and listed in `README.md` "Known limitations".
 - Local-only, git-excluded files: `ARCHITECTURE_AUDIT.md`, `RESEARCH_SAATHI_HEALIUM.md`, everything under `.superpowers/` (ledgers, briefs, reports). Never commit them.
 

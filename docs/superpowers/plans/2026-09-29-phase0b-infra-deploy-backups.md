@@ -1283,7 +1283,7 @@ Append to `README.md`:
 
 ### Task 8: Execute on the VPS and close Phase 0
 
-**Status:** Deferred (2026-10-02): executed when hosting is chosen; see PLAN.md §18 Phase 0 deployment criteria.
+**Status:** Deferred (2026-10-02): executed as PLAN.md §18 Phase 1D when hosting is chosen.
 
 **Files:**
 - Create: `docs/adr/0001-phase-0-exit.md`

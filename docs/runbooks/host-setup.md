@@ -393,7 +393,8 @@ Then:
 
 Every alert in PLAN.md §14.4 that the code can raise today, once on purpose. `check.sh` runs every 5 minutes, so allow
 up to 5 minutes for each `[ALERT]` and each `[RECOVERED]` in Slack. Record the times below and copy the table into the
-Phase 0 exit note (`docs/adr/0001-phase-0-exit.md`, written in Phase 0B Task 8).
+Phase 1D (first deployment) evidence: append it to `docs/adr/0001-phase-0-exit.md` or a follow-up ADR (PLAN.md §18
+Phase 1D).
 
 | Alert | How to trigger | How to recover | Alert seen at | Recovery seen at |
 | --- | --- | --- | --- | --- |
