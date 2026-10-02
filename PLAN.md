@@ -4,6 +4,8 @@ Status: **draft for review, revision 5** (clinical model rewritten; simplified a
 
 rev 5.1 (2026-10-01): wording aligned with the Phase 0B code (§11, §14.1, §15.2–§15.4; no decision changed).
 
+rev 5.2 (2026-10-02): Phase 0 exit criteria split into repository and deployment criteria; hosting deferred; names provisional.
+
 This document is the single source of truth for *what* we are building, *how* it is structured, and *in which order* it gets built. It is written to be read top to bottom once, then used as a reference. Every design choice records the reason and, where relevant, the thing we chose *not* to do. Nothing here is aspirational: if it is in a phase, it will be built in that phase.
 
 ---
@@ -1191,6 +1193,8 @@ One VPS, the cheapest that meets the spec: 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS, I
 
 There is no backup host in v1 (D24). The restic repository lives on the attached volume and is mirrored to the developer's machine; the same VPS runs the monthly restore test in a throwaway container.
 
+**Status (2026-10-02): hosting is undecided.** The owner will choose between a VPS and a cloud instance and say when; the Compose stack (§15.2) is host-agnostic, so the specification above holds for either. Until then the application runs on the developer's machine (`dev` profile, §15.4), and the organisation's name and domain (`saathicares.org`, `staging.saathicares.org`) are provisional. Nothing in Phases 1–3 *development* requires the host; the first live camp (the Phase 2 pilot, §18) and any real patient data do, and so do the staging environment (§15.4) and with it the per-phase demo on staging (§18). The steps that need the host are the Phase 0 deployment criteria (§18 Phase 0).
+
 ### 15.2 Containers (`infra/compose.yaml`, profiles: `core`, `dev`, `observability`; staging is `-p staging --profile core` with `infra/compose.staging.yaml`)
 
 | Service | Image | Profile | Memory limit | Notes |
@@ -1289,7 +1293,7 @@ Each phase is delivered module by module (§23.1) and ends with a demo on stagin
 
 ### Phase 0 — Foundation, deploy, backups (≈ 3 weeks)
 
-**Goal:** the Next.js app runs in Docker on the VPS against Postgres, with CI, deploy, backups, restore test, health checks and off-box uptime monitoring all working before any real data exists.
+**Goal:** the Next.js app runs in Docker on the VPS (deployment criteria, deferred) against Postgres, with CI, deploy, backups, restore test, health checks and off-box uptime monitoring all working before any real data exists.
 
 - Scaffold Next.js App Router in-repo; `strict` TypeScript; port the Tailwind theme, shadcn components, fonts and the `index.html` metadata to `app/layout.tsx`. Port the public pages as server components reading a static content object (they stay on staging until Phase 4; the no-code site remains live).
 - `src/server` skeleton: config, db client, migrations runner, logger with redaction, handler wrapper, error taxonomy (§9.7), request id, health endpoints, `StorageAdapter` (local), pg-boss in-process.
@@ -1298,7 +1302,23 @@ Each phase is delivered module by module (§23.1) and ends with a demo on stagin
 - CI (`ci.yml`, `nightly.yml`) and deploy (`deploy.yml`) to staging and prod; host setup runbook executed; sealed key envelope handed to the founder.
 - Repo hygiene: delete `src/lib/*`, seed credentials, `App.css`, React Router.
 
-Exit criteria: `docker compose up` on a clean machine serves the app over HTTPS; CI green; a tagged release deploys to prod through the approval gate and `rollback.sh` returns to the previous tag; a restore test has passed on the VPS and the mirror exists on the developer's machine; every alert in §14.4 has been triggered once on purpose and seen in the alert channel; no `localStorage` writes remain; `npm run lint` and `tsc` clean.
+Exit criteria (split 2026-10-02, rev 5.2, because hosting is deferred, §15.1):
+
+*(a) Repository criteria* — these close Phase 0 on the repository:
+- the app builds and runs locally against Postgres (`dev` profile, §15.4);
+- the CI, deploy, backup, host-check and runbook code exists and has been reviewed;
+- no `localStorage` writes remain;
+- `npm run lint` and `tsc` clean;
+- the unit, integration and e2e suites are green.
+
+*(b) Deployment criteria* — deferred, need a host; executed as **"Phase 0 deployment"** when the owner chooses hosting, following `docs/runbooks/host-setup.md` and Task 8 of `docs/superpowers/plans/2026-09-29-phase0b-infra-deploy-backups.md`, and complete before any real patient data is entered (the first live camp, Phase 2):
+- `docker compose up` on a clean machine serves the app over HTTPS;
+- CI green on GitHub;
+- a tagged release deploys to prod through the approval gate and `rollback.sh` returns to the previous tag;
+- a restore test has passed on the host and the mirror exists on the developer's machine;
+- every alert in §14.4 has been triggered once on purpose and seen in the alert channel.
+
+The scope items above that need the host (host setup runbook executed, hosted uptime monitor, sealed key envelope handed to the founder, the scheduled restore test) are done in the same Phase 0 deployment. The evidence for (a) and the status of (b) are in `docs/adr/0001-phase-0-exit.md`.
 
 ### Phase 1 — Identity, access, audit (≈ 2 weeks)
 
