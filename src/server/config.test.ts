@@ -36,6 +36,12 @@ describe('loadConfig', () => {
     );
   });
 
+  it.each(['1.5', '0', 'abc'])('rejects JOBS_CONCURRENCY=%s', (value) => {
+    const load = () => loadConfig({ ...valid, JOBS_CONCURRENCY: value });
+    expect(load).toThrowError(ConfigError);
+    expect(load).toThrow(/JOBS_CONCURRENCY/);
+  });
+
   it('coerces JOBS_ENABLED=false', () => {
     expect(loadConfig({ ...valid, JOBS_ENABLED: 'false' }).jobsEnabled).toBe(false);
   });

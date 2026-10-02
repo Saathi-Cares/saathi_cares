@@ -152,6 +152,7 @@ describe('withHandler', () => {
       routeCtx,
     );
     expect(res.status).toBe(404);
+    expect(res.headers.get('x-request-id')).toBe('client-id-1');
     expect((await res.json()).error.request_id).toBe('client-id-1');
   });
 

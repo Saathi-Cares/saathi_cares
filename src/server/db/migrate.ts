@@ -4,7 +4,7 @@ import { Client } from 'pg';
 
 type Options = { connectionString: string; dir: string; log?: (msg: string) => void };
 
-const LOCK_KEY = 74_119_001; // arbitrary constant: one migrator at a time per database
+export const LOCK_KEY = 74_119_001; // arbitrary constant: one migrator at a time per database
 
 export async function runMigrations(opts: Options): Promise<{ applied: string[] }> {
   const log = opts.log ?? (() => undefined);

@@ -73,6 +73,63 @@ describe('redactDeep', () => {
     }
   });
 
+  it('redacts every field name on the fixed §8.9 list, alone and in a payload', () => {
+    // A fixed copy, not REDACTED_KEYS itself: removing any entry from the module must fail here.
+    const expected = [
+      // credentials
+      'password',
+      'password_hash',
+      'mfa_secret',
+      'mfa_secret_enc',
+      'token',
+      'access_token',
+      'refresh_token',
+      'api_key',
+      'secret',
+      'authorization',
+      'cookie',
+      'set_cookie',
+      // tier 2 identifiers
+      'phone',
+      'phone_number',
+      'alt_phone',
+      'mobile',
+      'email',
+      'email_address',
+      'address',
+      'address_line',
+      'guardian_name',
+      'dob',
+      'pan',
+      'pan_enc',
+      'value_enc',
+      'identifiers',
+      // tier 3 clinical
+      'medical_history',
+      'dental_history',
+      'vitals',
+      'chief_complaint',
+      'presenting_symptoms',
+      'volunteer_notes',
+      'checklist',
+      'result',
+      'clinical_findings',
+      'soft_tissue_findings',
+      'diagnosis_summary',
+      'medications',
+      'general_instructions',
+      'follow_up_instructions',
+      'content_summary',
+      'notes',
+      'baseline',
+      'content',
+    ];
+    for (const k of expected) {
+      expect(isRedactedKey(k), k).toBe(true);
+      expect(redactDeep({ [k]: 'zq-value', keep: 1 }), k).toEqual({ [k]: '[redacted]', keep: 1 });
+    }
+  });
+
   it('walks shared (non-cyclic) references in full each time', () => {
     const shared = { phone: '1', keep: 2 };
     expect(redactDeep({ a: shared, b: shared })).toEqual({

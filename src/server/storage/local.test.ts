@@ -44,6 +44,15 @@ describe('LocalStorageAdapter', () => {
     expect(await fs.readdir(root)).toEqual([]);
   });
 
+  // These resolve inside the root, so only the key pattern rejects them: an accepted `a/../b` would alias `b`.
+  it('rejects dot segments that stay inside the root', async () => {
+    for (const bad of ['a/../b', 'private/./x', './x', 'private/..', '.hidden']) {
+      await expect(storage.put(bad, Buffer.from('x'))).rejects.toBeInstanceOf(ValidationError);
+      await expect(storage.exists(bad)).rejects.toBeInstanceOf(ValidationError);
+    }
+    expect(await fs.readdir(root)).toEqual([]);
+  });
+
   it('accepts dots inside a segment', async () => {
     await storage.put('private/x..jpg', Buffer.from('x'));
     expect(await storage.exists('private/x..jpg')).toBe(true);

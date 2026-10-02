@@ -134,40 +134,46 @@ One mobile run against `npm run start` on the developer's machine scored perform
 
 Not measurable until deployed. 0B Task 8 Step 6 asks for `docker stats` after 24 h on the host. `PLAN.md:1211` budgets about 2.6 GB resident with `core` only, including the OS. The `mem_limit` values in `infra/compose.yaml` (lines 30, 51, 74, 97, 124: 1536m, 256m, 768m, 64m, 128m) are limits, not measurements.
 
-## Test sensitivity (mutation check, 2026-10-02)
+## Test sensitivity (mutation check, re-run 2026-10-02 after the test-gap fixes)
 
-Method: one deliberate semantic break per module. Then run the relevant suite, record the failing tests, and `git checkout -- <file>`. After every revert, `git status --porcelain -- <file>` was empty. Rows marked "probe" are extra breaks beyond the one per module, added where the first result suggested a gap.
+Method: one deliberate semantic break per module, plus extra breaks ("probes") where the first check on 2026-10-02 suggested a gap. Each break was applied to the working tree, then `npm run test` and `npm run test:int` were both run, the failing tests were recorded, and the file was restored with `git checkout -- <file>`. After every restore `git status --porcelain -- <file>` showed no unstaged change. The run used the tree with the test-gap tests below.
 
-| # | Module | Break | Suite | Caught? | Failing tests |
-| --- | --- | --- | --- | --- | --- |
-| M1 | `src/server/observability/redaction.ts` | tier-2 identifier class (`phone` … `identifiers`, lines 16–30) removed from `REDACTED_KEYS` | unit | **yes** (6 failed) | `redaction.test.ts:11`, `:26`, `:58`, `:76`, `:90`; `logger.test.ts:11` |
-| M1b (probe) | same | only `'dob'` removed | unit | **no** | — |
-| M2 | `src/server/http/errors.ts` | `40001` returns `undefined` (falls through to a 500) instead of `ConflictError` (409) | unit | **yes** (1) | `errors.test.ts:75` |
-| M3 | `src/server/http/handler.ts` | `x-request-id` not set on the success path (line 61) | unit | **yes** (3) | `handler.test.ts:37`, `:120`, `:186` |
-| M3b (probe) | same | `x-request-id` not set on the error path (line 85) | unit | **no** | — |
-| M4 | `src/server/health/readiness.ts` | the catch returns `'ok'` when the error is the timeout | unit + int | **yes** (unit 1; int 10/10 passed) | `readiness.test.ts:19` |
-| M5 | `src/server/config.ts` | `JOBS_CONCURRENCY` `.max(8)` removed (9 accepted) | unit | **yes** (1) | `config.test.ts:21` |
-| M5b (probe) | same | `.int()` removed (1.5 accepted) | unit | **no** | — |
-| M6 | `src/server/db/migrate.ts` | `pg_advisory_lock` call removed (line 22) | int | **no** | — |
-| M6b (probe) | same | `rollback` after a failed file removed (lines 39–41) | int | **no** | — (see below) |
-| M7 | `src/server/jobs/start-consumer.ts` | handler error swallowed (no log, no rethrow) | int | **yes** (1) | `boss.int.test.ts:100` |
-| M8 | `src/server/storage/local.ts` | `KEY_PATTERN` lets segments start with `.`, so `..` is allowed | unit | **no** | — |
-| M8b (probe) | same | containment check (`full.startsWith(root)`) removed | unit | **no** | — |
+| # | Module | Break | Caught? | Failing tests |
+| --- | --- | --- | --- | --- |
+| M1 | `src/server/observability/redaction.ts` | tier-2 identifier class (`phone` … `identifiers`) removed from `REDACTED_KEYS` | **yes** (unit, 7) | `redaction.test.ts:11`, `:26`, `:58`, `:76`, `:133`, `:147`; `logger.test.ts:11` |
+| M1b (probe) | same | only `'dob'` removed | **yes** (unit, 1) | `redaction.test.ts:76` |
+| M2 | `src/server/http/errors.ts` | `40001` returns `undefined` (falls through to a 500) instead of `ConflictError` (409) | **yes** (unit, 1) | `errors.test.ts:75` |
+| M3 | `src/server/http/handler.ts` | `x-request-id` not set on the success path | **yes** (unit, 3) | `handler.test.ts:37`, `:120`, `:187` |
+| M3b (probe) | same | `x-request-id` not set on the error path | **yes** (unit, 1) | `handler.test.ts:146` |
+| M4 | `src/server/health/readiness.ts` | the catch returns `'ok'` when the error is the timeout | **yes** (unit, 1; int 11/11 passed) | `readiness.test.ts:19` |
+| M5 | `src/server/config.ts` | `JOBS_CONCURRENCY` `.max(8)` removed (9 accepted) | **yes** (unit, 1) | `config.test.ts:21` |
+| M5b (probe) | same | `.int()` removed (1.5 accepted) | **yes** (unit, 1) | `config.test.ts:39` (`rejects JOBS_CONCURRENCY=1.5`) |
+| M6 | `src/server/db/migrate.ts` | `pg_advisory_lock` call removed | **yes** (int, 1) | `migrate.int.test.ts:68` |
+| M6b (probe) | same | `rollback` after a failed file removed | **no** (unit 76 passed, int 11/11 passed) | none; an equivalent mutant, see item 6 below |
+| M7 | `src/server/jobs/start-consumer.ts` | handler error swallowed (no log, no rethrow) | **yes** (int, 1) | `boss.int.test.ts:100` |
+| M8 | `src/server/storage/local.ts` | `KEY_PATTERN` lets segments start with `.`, so `..` is allowed | **yes** (unit, 1) | `local.test.ts:48` |
+| M8b (probe) | same | containment check (`full.startsWith(root)`) removed | **no** (unit 76 passed, int 11/11 passed) | none; an equivalent mutant, see item 7 below |
 
-Primary mutations: **6 of 8 caught** (M1, M2, M3, M4, M5, M7). **2 not caught** (M6, M8). Probes: 0 of 5 caught.
+Primary mutations: **8 of 8 caught**. Probes: **3 of 5 caught** (M1b, M3b, M5b). Overall **11 of 13**. The two uncaught probes are equivalent mutants under the current code: no input to the module's public functions gives a different result with the break, so no test was written for them.
 
-### Test gaps (tests that should exist; not written in this task)
+### Test gaps: what was closed, and what remains
 
-1. **Migration lock (M6).** A test in `src/server/db/migrate.int.test.ts` should run two `runMigrations` calls concurrently on one database, with a migration slow enough to overlap (for example `select pg_sleep(1)`). It should assert that each file is applied exactly once and that neither call fails with a duplicate key on `schema_migrations`.
-2. **Migration rollback (M6b).** With today's code this mutant is probably equivalent. `runMigrations` throws and then ends the connection (`migrate.ts:42,49`), so Postgres discards the aborted transaction anyway, and the existing test at `migrate.int.test.ts:32` still sees nothing applied. This is reasoning, not a test result. A test only matters if the client is ever reused after a failure, so no test is proposed now.
-3. **Storage keys with a `..` segment that stays inside the root (M8).** Add `a/../b` and `private/./x` to the rejection list in `local.test.ts:40` and `:52`. Today the two layers (the pattern at `local.ts:11` and the containment check at `local.ts:18`) each hide the other's removal: every bad key in the test is rejected by both. With M8, `a/../b` would be accepted as an alias of `b` (reasoned from the regex; not executed). With M8b, the pattern alone still blocks every listed key.
-4. **`x-request-id` on error responses (M3b).** `handler.test.ts:146` ("maps thrown AppErrors and echoes the incoming request id") should assert `res.headers.get('x-request-id')`, not only the body.
-5. **Non-integer `JOBS_CONCURRENCY` (M5b).** `config.test.ts` should reject `JOBS_CONCURRENCY=1.5` and `0`.
-6. **Redaction key coverage (M1b).** A name-matching script over `src/server/**/*.test.ts` found 22 of the 44 `REDACTED_KEYS` never named in a test. Among them are `dob`, `guardian_name`, `address`, `pan`, `notes`, `result` and `token`. `redaction.test.ts:58` should iterate over every entry of `REDACTED_KEYS`, or over a fixed copy of the §8.9 list so that a removal fails, instead of a hand-picked subset.
+Closed. Each test passed against the code, failed against the mutation, and passed again after `git checkout -- <file>`.
+
+1. **Migration lock (M6).** `migrate.int.test.ts:68` runs two `runMigrations` calls at once on a temporary directory holding one probe migration. The probe first takes a second advisory lock (the gate, `LOCK_KEY + 1`) that the test holds, and the test releases the gate only after `pg_locks` shows both migrators waiting. This makes the test deterministic instead of timing-based. With the lock, one migrator waits at the gate and the other on `LOCK_KEY`; both calls resolve, the file is applied once, and the marker table has one row. Without the lock, both migrators have already read "not applied" and both wait at the gate. The failure without the lock is `expected [ 74119002, 74119002 ] to deeply equal [ 74119001, 74119002 ]`. With that assertion disabled, the outcome assertions also fail: `expected [ 'rejected', 'fulfilled' ] to deeply equal [ 'fulfilled', 'fulfilled' ]`, from the duplicate key on `schema_migrations`. `LOCK_KEY` is now exported from `migrate.ts:7` for the test; its value did not change.
+2. **Storage keys with dot segments that stay inside the root (M8).** `local.test.ts:48` rejects `a/../b`, `private/./x`, `./x`, `private/..` and `.hidden` through both `put` and `exists`, and checks that nothing was written.
+3. **`x-request-id` on error responses (M3b).** `handler.test.ts:146` now asserts the header, not only the body.
+4. **Non-integer `JOBS_CONCURRENCY` (M5b).** `config.test.ts:39` rejects `1.5`, `0` and `abc`.
+5. **Redaction key coverage (M1b).** `redaction.test.ts:76` checks a fixed copy of all 44 field names: the credentials and the §8.9 tier-2 and tier-3 names. Every name must satisfy `isRedactedKey` and be redacted by `redactDeep`, so removing any entry from `REDACTED_KEYS` fails the test. Adding a field to the module does not fail it, so a new field has to be added to the copy by hand.
+
+Remaining. Neither is caught, and both are equivalent mutants.
+
+6. **Migration rollback (M6b).** After a failed file, `runMigrations` throws, and its `finally` (`migrate.ts:47-50`) tries `pg_advisory_unlock` and then calls `client.end()`. Without the rollback, the unlock fails inside the aborted transaction and is swallowed by its `.catch`. Closing the connection then makes Postgres abort the transaction and release the session's advisory lock anyway. So with or without the rollback, the failed file is not recorded and the lock is free for the next run. The suite confirms this: with the mutation, unit 76 passed and int 11/11 passed. The only observable difference would be how soon the lock is released after `client.end()` resolves. That is a timing race, not something a deterministic test can check. A meaningful test needs a client that is reused after a failure, and the code never reuses one, so no test was written.
+7. **Storage containment check (M8b).** `KEY_PATTERN` (`local.ts:11`) admits only non-empty keys made of `/`-separated segments that start with a letter or digit and contain only `[A-Za-z0-9._-]`. Such a key has no `.` or `..` segment, no leading `/`, no `\` and no `:` (so no Windows drive letter). `path.resolve(root, key)` therefore always lies strictly inside the root, and the `startsWith` check at `local.ts:18` never changes the outcome while the pattern is intact. The check is defence in depth against a future change to the pattern. A test for it would have to get a key past the pattern, and the adapter offers no way to do that, so no test was written. With the mutation, unit 76 passed and int 11/11 passed.
 
 ## Consequences
 
 - Phase 0 is closed on the repository. Phase 1 development can start on the developer's machine. Nothing in Phase 1–3 *development* needs the host (`PLAN.md:1196`).
 - Before the first real patient data (the first live camp, Phase 2, `PLAN.md:1353`), the deployment criteria (b) must be met and recorded. That means appending their evidence to this ADR or writing a follow-up ADR, with the alert table from `host-setup.md` §12, the deploy and rollback timings, and `docker stats` after 24 h.
-- The test gaps above are open. They are listed for whoever plans the next test-hardening work, and are not part of this change.
+- The test gaps found by the mutation check are closed, except the two equivalent mutants (M6b, M8b) explained above.
 - The organisation name, domain and contact details remain provisional (`CLAUDE.md:9`).
