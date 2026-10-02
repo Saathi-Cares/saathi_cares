@@ -1259,7 +1259,7 @@ One VPS, the cheapest that meets the spec: 2 vCPU, 4 GB RAM, Ubuntu 24.04 LTS, I
 
 There is no backup host in v1 (D24). The restic repository lives on the attached volume and is mirrored to the developer's machine; the same VPS runs the monthly restore test in a throwaway container.
 
-**Status (2026-10-02): hosting is undecided.** The owner will choose between a VPS and a cloud instance and say when; the Compose stack (§15.2) is host-agnostic, so the specification above holds for either. Until then the application runs on the developer's machine (`dev` profile, §15.4), and the organisation's name and domain (`saathicares.org`, `staging.saathicares.org`) are provisional. Nothing in Phases 1–3 *development* requires the host; the first live camp (the Phase 2 pilot, §18) and any real patient data do, and so do the staging environment (§15.4) and with it the per-phase demo on staging (§18). The steps that need the host are the Phase 1D criteria (§18 Phase 0).
+**Status (2026-10-02): hosting is undecided.** The owner will choose between a VPS and a cloud instance and say when; the Compose stack (§15.2) is host-agnostic, so the specification above holds for either. Until then the application runs on the developer's machine (`dev` profile, §15.4), and the organisation's name and domain (`saathicares.org`, `staging.saathicares.org`) are provisional. Nothing in Phases 1–3 *development* requires the host; the first live camp (the Phase 2 pilot, §18) and any real patient data do, and so do the staging environment (§15.4) and with it the per-phase demo on staging (§18). The steps that need the host are the Phase 1D criteria (§18 Phase 1D).
 
 ### 15.2 Containers (`infra/compose.yaml`, profiles: `core`, `dev`, `observability`; staging is `-p staging --profile core` with `infra/compose.staging.yaml`)
 
@@ -1296,7 +1296,7 @@ Config is env-only (`src/server/config.ts`, zod-validated). `.env.example` is th
 - **Developer-machine mirror.** A scheduled task on the developer's machine runs `restic copy` from the VPS whenever the machine is online (typically daily); check.sh alerts if the mirror is older than 3 days. This is the only protection against loss of the VPS itself, so the effective RPO for that case is the age of the last mirror. Accepted risk (D24); a backup host or a cheap object-storage bucket replaces the mirror in one day when the organisation is ready.
 - **Monthly restore test on the VPS** (not on GitHub runners, so no PHI or keys leave our machines): restore the newest dump into a scratch database inside the production Postgres instance, dropped afterwards (`infra/backup/restore-test.sh`; a throwaway Postgres container would need the Docker socket inside the backup container or a second host cron job, and a second Postgres in memory on a 4 GB host), check that `schema_migrations` has rows (row-count and referential-integrity checks over the clinical tables are added with those tables, from Phase 1), restore up to three public media files and compare their hashes with the live copies, post the result to the alert channel. A restore that has not been tested is not a backup; check.sh alerts if the last test is older than 35 days. The developer runs the same script against the mirror once a quarter.
 - **Keys.** The restic passphrase, the application encryption key and the super-admin recovery codes are held by the developer; a printed, sealed copy goes to the organisation's founder with the one-page recovery instructions from `docs/runbooks/disaster-recovery.md` (D24).
-- **Targets:** RPO 6 h for corruption, mirror age for VPS loss; **RTO 4 h** via the runbook (new VPS → compose up → restic restore from the mirror → DNS switch), rehearsed once before the first real patient record exists (Phase 0 exit criterion) and again before public launch (Phase 7).
+- **Targets:** RPO 6 h for corruption, mirror age for VPS loss; **RTO 4 h** via the runbook (new VPS → compose up → restic restore from the mirror → DNS switch), rehearsed once before the first real patient record exists (Phase 1D exit criterion) and again before public launch (Phase 7).
 
 ---
 
@@ -1403,7 +1403,7 @@ Exit criteria (moved from Phase 0 in rev 5.5; they need a host): executed when t
 - a restore test has passed on the host and the mirror exists on the developer's machine;
 - every alert in §14.4 has been triggered once on purpose and seen in the alert channel.
 
-The Phase 0 scope items that need the host (host setup runbook executed, hosted uptime monitor, sealed key envelope handed to the founder, the scheduled restore test) are done in this milestone. The evidence for (a) and the status of (b) are in `docs/adr/0001-phase-0-exit.md`.
+The Phase 0 scope items that need the host (host setup runbook executed, hosted uptime monitor, sealed key envelope handed to the founder, the scheduled restore test, the first disaster-recovery rehearsal of §15.5) are done in this milestone. The evidence for the Phase 0 repository criteria and the status of these Phase 1D criteria are in `docs/adr/0001-phase-0-exit.md`.
 
 ### Phase 2 — HMIS capture and dentist review, first camp pilot (≈ 7 weeks)
 
